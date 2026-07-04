@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "wifimap-852eb",
     "public": "map",
     "ignore": [
       "firebase.json",
