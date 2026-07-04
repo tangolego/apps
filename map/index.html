@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>내 위치 지도 보기</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { height: 100vh; width: 100vw; }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // 1. 지도 초기화
+    const map = L.map('map').setView([37.5665, 126.9780], 13);
+
+    // 2. 타일 레이어 설정
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // 3. 위치 정보 가져오기
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(success, error, {
+            enableHighAccuracy: true, // 정밀한 위치 사용
+            timeout: 10000            // 10초 대기
+        });
+    } else {
+        alert("이 브라우저는 위치 정보를 지원하지 않습니다.");
+    }
+
+    // 성공 시 콜백
+    function success(position) {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+
+        // 지도를 내 위치로 이동 및 마커 추가
+        map.setView([lat, lng], 15);
+        L.marker([lat, lng]).addTo(map)
+            .bindPopup("여기가 현재 위치입니다!")
+            .openPopup();
+    }
+
+    // 실패 시 콜백
+    function error(err) {
+        console.warn(`ERROR(${err.code}): ${err.message}`);
+        alert("위치 정보를 가져올 수 없습니다. 권한을 확인해주세요.");
+    }
+</script>
+
+</body>
+</html>
