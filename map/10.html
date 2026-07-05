@@ -145,7 +145,7 @@
 
   <div id="notice">
     🎥 용인시 재난안전 CCTV 10곳(고기동 8·동천동 2) — 마커 클릭 시 실시간 화면이 <b>새 창</b>으로 열립니다.
-    초록 핀(4곳)은 링크가 실제 클릭으로 검증됨, 주황 핀(6곳)은 동일 패턴 추정 적용. 좌표는 추정치이며 드래그로 보정·저장됩니다.
+    초록 핀(3곳)은 링크가 실제 클릭으로 검증됨, 주황 핀(7곳)은 동일 패턴 추정 적용. 좌표는 추정치이며 드래그로 보정·저장됩니다(이 브라우저에만 저장).
   </div>
   <div id="mapError"></div>
 
@@ -169,33 +169,43 @@
   const retryBtn = document.getElementById('retry');
   const mapErrorEl = document.getElementById('mapError');
 
-  // ---- CCTV 데이터: 이름·주소는 safe.yongin.go.kr 목록에서 확인, 영상 링크는 cn 값 기반 ----
-  function viewUrl(cn, cd, ct, ns){
-    return `http://safe.yongin.go.kr/w/cctv_view.html?cn=${cn}&page=1&cd=${cd}&ct=${ct}&ns=${encodeURIComponent(ns)}`;
+  // ---- CCTV 데이터 ----
+  // 링크 패턴은 첨부(표 버전)와 동일하게 통일: m/cctv_view.html?cn=&cd=1&ct=3
+  // cd(구코드)=1(수지구), ct(카테고리)=3 — 10곳 모두 동일값 사용.
+  function viewUrl(cn){
+    return `http://safe.yongin.go.kr/m/cctv_view.html?cn=${cn}&cd=1&ct=3`;
   }
   const cctvList = [
-    { id:'ch57',  name:'고기동 제1경보국',   address:'경기도 용인시 수지구 고기동 229-14', videoUrl: viewUrl(57,1,3,'고기동'), verified:false, lat:37.3020, lng:127.0790 },
-    { id:'ch58',  name:'고기동 제2경보국',   address:'경기도 용인시 수지구 고기동 755-37', videoUrl: viewUrl(58,1,3,'고기동'), verified:true,  lat:37.2955, lng:127.0655 },
-    { id:'ch62',  name:'고기계곡 제3경보국', address:'경기도 용인시 수지구 고기동 755-45', videoUrl: viewUrl(62,2,2,''),      verified:false, lat:37.2935, lng:127.0630 },
-    { id:'ch63',  name:'고기계곡 제4경보국', address:'경기도 용인시 수지구 고기동 755-37', videoUrl: viewUrl(63,2,2,''),      verified:false, lat:37.2958, lng:127.0660 },
-    { id:'ch73',  name:'동막천-고기계곡',    address:'경기도 용인시 수지구 고기동 755',    videoUrl: viewUrl(73,2,2,''),      verified:false, lat:37.2975, lng:127.0700 },
-    { id:'ch74',  name:'서분당 IC하부',      address:'경기도 용인시 수지구 고기동 755-45', videoUrl: viewUrl(74,2,2,''),      verified:false, lat:37.3060, lng:127.0860 },
-    { id:'ch121', name:'고기교',             address:'경기도 용인시 수지구 고기동 755-45', videoUrl: viewUrl(121,2,2,''),     verified:false, lat:37.2990, lng:127.0720 },
-    { id:'ch105', name:'말구리고개-2',       address:'경기도 용인시 수지구 고기동 340-7',  videoUrl: viewUrl(105,2,2,''),     verified:true,  lat:37.3140, lng:127.0820 },
-    { id:'ch33',  name:'말구리고개-1',       address:'경기도 용인시 수지구 동천동 687-7',  videoUrl: viewUrl(33,2,2,''),      verified:true,  lat:37.3170, lng:127.0850 },
-    { id:'ch106', name:'말구리고개-3',       address:'경기도 용인시 수지구 동천동 689-73', videoUrl: viewUrl(106,2,2,''),     verified:true,  lat:37.3155, lng:127.0870 }
-  ];
+    { id:'ch57',  name:'고기동 제1경보국',   address:'경기도 용인시 수지구 고기동 229-14', cn:57,  verified:false, lat:37.3020, lng:127.0790 },
+    { id:'ch58',  name:'고기동 제2경보국',   address:'경기도 용인시 수지구 고기동 755-37', cn:58,  verified:true,  lat:37.2955, lng:127.0655 },
+    { id:'ch62',  name:'고기계곡 제3경보국', address:'경기도 용인시 수지구 고기동 755-45', cn:62,  verified:false, lat:37.2935, lng:127.0630 },
+    { id:'ch63',  name:'고기계곡 제4경보국', address:'경기도 용인시 수지구 고기동 755-37', cn:63,  verified:false, lat:37.2958, lng:127.0660 },
+    { id:'ch73',  name:'동막천-고기계곡',    address:'경기도 용인시 수지구 고기동 755',    cn:73,  verified:false, lat:37.2975, lng:127.0700 },
+    { id:'ch74',  name:'서분당 IC하부',      address:'경기도 용인시 수지구 고기동 755-45', cn:74,  verified:false, lat:37.3060, lng:127.0860 },
+    { id:'ch121', name:'고기교',             address:'경기도 용인시 수지구 고기동 755-45', cn:121, verified:false, lat:37.2990, lng:127.0720 },
+    { id:'ch105', name:'말구리고개-2',       address:'경기도 용인시 수지구 고기동 340-7',  cn:105, verified:false, lat:37.3140, lng:127.0820 },
+    { id:'ch33',  name:'말구리고개-1',       address:'경기도 용인시 수지구 동천동 687-7',  cn:33,  verified:true,  lat:37.3170, lng:127.0850 },
+    { id:'ch106', name:'말구리고개-3',       address:'경기도 용인시 수지구 동천동 689-73', cn:106, verified:true,  lat:37.3155, lng:127.0870 }
+  ].map((c) => ({ ...c, videoUrl: viewUrl(c.cn) }));
 
-  async function loadSavedPosition(id){
+  // ---- 위치 보정값 저장: localStorage 사용 (이 브라우저/기기에만 저장됨) ----
+  const POS_PREFIX = 'cctv-pos:';
+
+  function loadSavedPosition(id){
     try{
-      const res = await window.storage.get('cctv-pos:' + id);
-      if(res && res.value) return JSON.parse(res.value);
-    }catch(e){ /* 저장된 값 없음 */ }
-    return null;
+      const raw = localStorage.getItem(POS_PREFIX + id);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){
+      console.error('저장된 위치 불러오기 실패', e);
+      return null;
+    }
   }
-  async function savePosition(id, lat, lng){
-    try{ await window.storage.set('cctv-pos:' + id, JSON.stringify({ lat, lng })); }
-    catch(e){ console.error('위치 저장 실패', e); }
+  function savePosition(id, lat, lng){
+    try{
+      localStorage.setItem(POS_PREFIX + id, JSON.stringify({ lat, lng }));
+    }catch(e){
+      console.error('위치 저장 실패', e);
+    }
   }
 
   function camPinHtml(verified){
@@ -223,8 +233,8 @@
     });
 
     // ---- CCTV 마커 ----
-    cctvList.forEach(async (cctv) => {
-      const saved = await loadSavedPosition(cctv.id);
+    cctvList.forEach((cctv) => {
+      const saved = loadSavedPosition(cctv.id);
       const lat = saved ? saved.lat : cctv.lat;
       const lng = saved ? saved.lng : cctv.lng;
 
