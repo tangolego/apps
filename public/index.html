@@ -4,11 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>현재 위치 · CCTV</title>
+<!-- 네이버 지도 API 로드 -->
 <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=cu551dcr6p&submodules=geocoder"></script>
 <style>
   :root{ --bg: #0b0f0e; --panel: #10201a; --line: #1f3a2e; --accent: #4ee6a6; }
-  html,body{ margin:0; padding:0; height:100%; background:var(--bg); color:#d9f3e6; font-family: monospace; }
+  html,body{ margin:0; padding:0; height:100%; background:var(--bg); color:#d9f3e6; font-family: sans-serif; }
   #map{ width:100%; height:100vh; }
+  .info-window { padding:10px; border:1px solid var(--line); background: var(--panel); border-radius: 5px; }
+  .info-window a { color: var(--accent); text-decoration: none; font-weight: bold; }
 </style>
 </head>
 <body>
@@ -17,16 +20,16 @@
 
 <script>
   const cctvList = [
-    { id:'ch57',  name:'고기동 제1경보국',   address:'경기도 용인시 수지구 고기동 229-14' },
-    { id:'ch58',  name:'고기동 제2경보국',   address:'경기도 용인시 수지구 고기동 755-37' },
-    { id:'ch62',  name:'고기계곡 제3경보국', address:'경기도 용인시 수지구 고기동 755-45' },
-    { id:'ch63',  name:'고기계곡 제4경보국', address:'경기도 용인시 수지구 고기동 755-37' },
-    { id:'ch73',  name:'동막천-고기계곡',    address:'경기도 용인시 수지구 고기동 755' },
-    { id:'ch74',  name:'서분당 IC하부',      address:'경기도 용인시 수지구 고기동 755-45' },
-    { id:'ch121', name:'고기교',             address:'경기도 용인시 수지구 고기동 755-45' },
-    { id:'ch105', name:'말구리고개-2',       address:'경기도 용인시 수지구 고기동 340-7' },
-    { id:'ch33',  name:'말구리고개-1',       address:'경기도 용인시 수지구 동천동 687-7' },
-    { id:'ch106', name:'말구리고개-3',       address:'경기도 용인시 수지구 동천동 689-73' }
+    { id:'57',  name:'고기동 제1경보국',   address:'경기도 용인시 수지구 고기동 229-14' },
+    { id:'58',  name:'고기동 제2경보국',   address:'경기도 용인시 수지구 고기동 755-37' },
+    { id:'62',  name:'고기계곡 제3경보국', address:'경기도 용인시 수지구 고기동 755-45' },
+    { id:'63',  name:'고기계곡 제4경보국', address:'경기도 용인시 수지구 고기동 755-37' },
+    { id:'73',  name:'동막천-고기계곡',    address:'경기도 용인시 수지구 고기동 755' },
+    { id:'74',  name:'서분당 IC하부',      address:'경기도 용인시 수지구 고기동 755-45' },
+    { id:'121', name:'고기교',             address:'경기도 용인시 수지구 고기동 755-45' },
+    { id:'105', name:'말구리고개-2',       address:'경기도 용인시 수지구 고기동 340-7' },
+    { id:'33',  name:'말구리고개-1',       address:'경기도 용인시 수지구 동천동 687-7' },
+    { id:'106', name:'말구리고개-3',       address:'경기도 용인시 수지구 동천동 689-73' }
   ];
 
   const map = new naver.maps.Map('map', {
@@ -34,7 +37,6 @@
     zoom: 14
   });
 
-  // 주소 기반 마커 생성 함수
   function createMarker(cctv) {
     naver.maps.Service.geocode({ query: cctv.address }, (status, response) => {
       if (status === naver.maps.Service.Status.OK && response.v2.addresses.length > 0) {
@@ -45,8 +47,15 @@
           title: cctv.name
         });
 
+        // 링크 URL 구성
+        const linkUrl = `http://safe.yongin.go.kr/m/cctv_view.html?cn=${cctv.id}&page=&cd=2&ct=2&ns=`;
+        
         const infoWindow = new naver.maps.InfoWindow({
-          content: `<div style="padding:10px;"><b>${cctv.name}</b><br>${cctv.address}</div>`
+          content: `
+            <div class="info-window">
+              <b>${cctv.name}</b><br>
+              <a href="${linkUrl}" target="_blank">▶ CCTV 영상 보기</a>
+            </div>`
         });
 
         naver.maps.Event.addListener(marker, 'click', () => {
@@ -56,7 +65,6 @@
     });
   }
 
-  // 모든 CCTV에 대해 마커 생성 실행
   cctvList.forEach(cctv => createMarker(cctv));
 </script>
 </body>
