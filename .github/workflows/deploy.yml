@@ -25,6 +25,6 @@ jobs:
       - name: Deploy Functions & Firestore
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
-          firebase deploy --only functions,firestore --project wifimap-852eb
+          firebase deploy --only functions,firestore --project wifimap-852eb --force
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
