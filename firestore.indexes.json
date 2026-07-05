@@ -1,0 +1,30 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "wifi_spots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "geohash6", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "wifi_spots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "source", "order": "ASCENDING" },
+        { "fieldPath": "buildingName", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "wifi_spots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "buildingNameLower", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

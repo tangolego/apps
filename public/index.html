@@ -4,151 +4,77 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>현재 위치 · CCTV</title>
-<script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=cu551dcr6p"></script>
+<script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=cu551dcr6p"></script>
 <style>
   :root{
-    --bg: #0b0f0e;
-    --panel: #10201a;
-    --line: #1f3a2e;
-    --accent: #4ee6a6;
-    --accent-dim: #2a8f66;
-    --text: #d9f3e6;
-    --text-dim: #7fa595;
+    --bg: #0b0f0e; --panel: #10201a; --line: #1f3a2e;
+    --accent: #4ee6a6; --accent-dim: #2a8f66;
+    --text: #d9f3e6; --text-dim: #7fa595;
     --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   }
   *{ box-sizing:border-box; }
-  html,body{
-    margin:0; padding:0; height:100%;
-    background:var(--bg);
-    color:var(--text);
-    font-family:var(--mono);
-  }
-  #app{
-    display:flex;
-    flex-direction:column;
-    height:100vh;
-  }
+  html,body{ margin:0; padding:0; height:100%; background:var(--bg); color:var(--text); font-family:var(--mono); }
+  #app{ display:flex; flex-direction:column; height:100vh; }
   header{
-    padding:14px 18px;
-    border-bottom:1px solid var(--line);
-    display:flex;
-    align-items:baseline;
-    justify-content:space-between;
-    gap:12px;
-    flex-wrap:wrap;
+    padding:14px 18px; border-bottom:1px solid var(--line);
+    display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;
   }
-  header h1{
-    font-size:14px;
-    letter-spacing:.14em;
-    text-transform:uppercase;
-    margin:0;
-    color:var(--accent);
-    font-weight:600;
-  }
-  #status{
-    font-size:12px;
-    color:var(--text-dim);
-    letter-spacing:.04em;
-  }
+  header h1{ font-size:14px; letter-spacing:.14em; text-transform:uppercase; margin:0; color:var(--accent); font-weight:600; }
+  #status{ font-size:12px; color:var(--text-dim); letter-spacing:.04em; }
   #status.live{ color:var(--accent); }
   #status.error{ color:#e6704e; }
-
-  #notice{
-    padding:8px 18px;
-    font-size:11px;
-    line-height:1.5;
-    color:var(--text-dim);
-    background:#0e1a15;
-    border-bottom:1px solid var(--line);
-  }
+  #notice{ padding:8px 18px; font-size:11px; line-height:1.5; color:var(--text-dim); background:#0e1a15; border-bottom:1px solid var(--line); }
   #notice b{ color:#e6b04e; font-weight:600; }
-  #mapError{
-    display:none;
-    padding:10px 18px;
-    font-size:12px;
-    line-height:1.5;
-    color:#ffd7c9;
-    background:#3a1a12;
-    border-bottom:1px solid #6b3322;
-  }
-
-  #map{
-    flex:1;
-    position:relative;
-  }
-
+  #mapError{ display:none; padding:10px 18px; font-size:12px; line-height:1.5; color:#ffd7c9; background:#3a1a12; border-bottom:1px solid #6b3322; }
+  #map{ flex:1; position:relative; }
   .cam-pin{
-    width:26px; height:26px; border-radius:50% 50% 50% 0;
-    background:#e6704e; transform:rotate(-45deg);
-    border:2px solid #0b0f0e;
-    display:flex; align-items:center; justify-content:center;
-    box-shadow:0 2px 6px rgba(0,0,0,0.5);
-    cursor:pointer;
+    width:26px; height:26px; border-radius:50% 50% 50% 0; background:#e6704e; transform:rotate(-45deg);
+    border:2px solid #0b0f0e; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 2px 6px rgba(0,0,0,0.5); cursor:pointer;
   }
   .cam-pin svg{ transform:rotate(45deg); }
   .cam-pin.verified{ background:#4ee6a6; }
-
-  .me-dot{
-    width:16px;height:16px;border-radius:50%;
-    background:#4ee6a6;border:3px solid #0b0f0e;
-    box-shadow:0 0 0 4px rgba(78,230,166,0.35);
-  }
-
+  .cam-pin.saving{ opacity:0.5; }
+  .me-dot{ width:16px;height:16px;border-radius:50%; background:#4ee6a6;border:3px solid #0b0f0e; box-shadow:0 0 0 4px rgba(78,230,166,0.35); }
   .iw{ font-family:var(--mono); color:#0b0f0e; padding:10px 12px; min-width:170px; }
   .iw .name{ font-size:13px; font-weight:700; margin:0 0 2px; }
   .iw .addr{ font-size:11px; color:#4a5a53; margin:0 0 8px; }
-  .iw a.open{
-    display:block; text-align:center; text-decoration:none;
-    font-size:11px; font-weight:600; padding:7px 6px; border-radius:2px;
-    background:var(--accent); color:#0b0f0e;
-  }
+  .iw a.open{ display:block; text-align:center; text-decoration:none; font-size:11px; font-weight:600; padding:7px 6px; border-radius:2px; background:var(--accent); color:#0b0f0e; }
   .iw .badge{ margin-top:6px; font-size:10px; }
   .iw .badge.ok{ color:#1f8f5a; }
   .iw .badge.guess{ color:#8a978f; }
   .iw .hint{ margin-top:4px; font-size:10px; color:#8a978f; }
-
   #readout{
-    border-top:1px solid var(--line);
-    background:var(--panel);
-    padding:14px 18px 18px;
-    display:grid;
-    grid-template-columns:repeat(auto-fit, minmax(130px,1fr));
-    gap:14px 22px;
+    border-top:1px solid var(--line); background:var(--panel); padding:14px 18px 18px;
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(130px,1fr)); gap:14px 22px;
   }
   .field{ display:flex; flex-direction:column; gap:4px; }
-  .field .label{
-    font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--text-dim);
-  }
+  .field .label{ font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--text-dim); }
   .field .value{ font-size:18px; color:var(--text); font-variant-numeric: tabular-nums; }
   .field .value.accent{ color:var(--accent); }
-
   #retry{
-    margin-top:2px; background:transparent; border:1px solid var(--accent-dim);
-    color:var(--accent); font-family:var(--mono); font-size:12px; padding:8px 14px;
-    letter-spacing:.06em; cursor:pointer; border-radius:2px; display:none; width:fit-content;
+    margin-top:2px; background:transparent; border:1px solid var(--accent-dim); color:var(--accent);
+    font-family:var(--mono); font-size:12px; padding:8px 14px; letter-spacing:.06em; cursor:pointer;
+    border-radius:2px; display:none; width:fit-content;
   }
   #retry:hover{ background:var(--accent-dim); color:#06140f; }
   #retry:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-
-  @media (max-width:480px){
-    header h1{ font-size:12px; }
-    #readout{ grid-template-columns:repeat(2,1fr); }
-  }
+  @media (max-width:480px){ header h1{ font-size:12px; } #readout{ grid-template-columns:repeat(2,1fr); } }
 </style>
 </head>
 <body>
 <div id="app">
   <header>
     <h1>현재 위치 · CCTV</h1>
-    <span id="status">위치 확인 대기 중…</span>
+    <span id="status">불러오는 중…</span>
   </header>
 
   <div id="notice">
-    🎥 용인시 재난안전 CCTV 10곳(고기동 8·동천동 2) — 마커 클릭 시 실시간 화면이 <b>새 창</b>으로 열립니다.
-    초록 핀(3곳)은 링크가 실제 클릭으로 검증됨, 주황 핀(7곳)은 동일 패턴 추정 적용. 좌표는 추정치이며 드래그로 보정·저장됩니다(이 브라우저에만 저장).
+    🎥 용인시 재난안전 CCTV 10곳 — 마커 클릭 시 실시간 화면이 <b>새 창</b>으로 열립니다.
+    초록 핀은 링크가 실제 클릭으로 검증됨, 주황 핀은 동일 패턴 추정 적용.
+    좌표는 추정치이며 드래그로 보정하면 <b>모든 사용자에게 공유 저장</b>돼요 (Firestore).
   </div>
   <div id="mapError"></div>
-
   <div id="map"></div>
 
   <div id="readout">
@@ -161,6 +87,8 @@
 </div>
 
 <script>
+  const API_BASE = "/api"; // Hosting rewrite로 같은 오리진에서 Cloud Function 호출
+
   const statusEl = document.getElementById('status');
   const latEl = document.getElementById('lat');
   const lngEl = document.getElementById('lng');
@@ -169,43 +97,19 @@
   const retryBtn = document.getElementById('retry');
   const mapErrorEl = document.getElementById('mapError');
 
-  // ---- CCTV 데이터 ----
-  // 링크 패턴은 첨부(표 버전)와 동일하게 통일: m/cctv_view.html?cn=&cd=1&ct=3
-  // cd(구코드)=1(수지구), ct(카테고리)=3 — 10곳 모두 동일값 사용.
-  function viewUrl(cn){
-    return `http://safe.yongin.go.kr/m/cctv_view.html?cn=${cn}&cd=1&ct=3`;
+  async function fetchCctvSpots(){
+    const res = await fetch(`${API_BASE}/cctv-spots`);
+    if(!res.ok) throw new Error('CCTV 목록을 불러오지 못했어요 (' + res.status + ')');
+    return res.json();
   }
-  const cctvList = [
-    { id:'ch57',  name:'고기동 제1경보국',   address:'경기도 용인시 수지구 고기동 229-14', cn:57,  verified:false, lat:37.3020, lng:127.0790 },
-    { id:'ch58',  name:'고기동 제2경보국',   address:'경기도 용인시 수지구 고기동 755-37', cn:58,  verified:true,  lat:37.2955, lng:127.0655 },
-    { id:'ch62',  name:'고기계곡 제3경보국', address:'경기도 용인시 수지구 고기동 755-45', cn:62,  verified:false, lat:37.2935, lng:127.0630 },
-    { id:'ch63',  name:'고기계곡 제4경보국', address:'경기도 용인시 수지구 고기동 755-37', cn:63,  verified:false, lat:37.2958, lng:127.0660 },
-    { id:'ch73',  name:'동막천-고기계곡',    address:'경기도 용인시 수지구 고기동 755',    cn:73,  verified:false, lat:37.2975, lng:127.0700 },
-    { id:'ch74',  name:'서분당 IC하부',      address:'경기도 용인시 수지구 고기동 755-45', cn:74,  verified:false, lat:37.3060, lng:127.0860 },
-    { id:'ch121', name:'고기교',             address:'경기도 용인시 수지구 고기동 755-45', cn:121, verified:false, lat:37.2990, lng:127.0720 },
-    { id:'ch105', name:'말구리고개-2',       address:'경기도 용인시 수지구 고기동 340-7',  cn:105, verified:false, lat:37.3140, lng:127.0820 },
-    { id:'ch33',  name:'말구리고개-1',       address:'경기도 용인시 수지구 동천동 687-7',  cn:33,  verified:true,  lat:37.3170, lng:127.0850 },
-    { id:'ch106', name:'말구리고개-3',       address:'경기도 용인시 수지구 동천동 689-73', cn:106, verified:true,  lat:37.3155, lng:127.0870 }
-  ].map((c) => ({ ...c, videoUrl: viewUrl(c.cn) }));
 
-  // ---- 위치 보정값 저장: localStorage 사용 (이 브라우저/기기에만 저장됨) ----
-  const POS_PREFIX = 'cctv-pos:';
-
-  function loadSavedPosition(id){
-    try{
-      const raw = localStorage.getItem(POS_PREFIX + id);
-      return raw ? JSON.parse(raw) : null;
-    }catch(e){
-      console.error('저장된 위치 불러오기 실패', e);
-      return null;
-    }
-  }
-  function savePosition(id, lat, lng){
-    try{
-      localStorage.setItem(POS_PREFIX + id, JSON.stringify({ lat, lng }));
-    }catch(e){
-      console.error('위치 저장 실패', e);
-    }
+  async function saveCorrectedPosition(id, lat, lng){
+    const res = await fetch(`${API_BASE}/cctv-spots/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat, lng }),
+    });
+    if(!res.ok) throw new Error('위치 저장 실패 (' + res.status + ')');
   }
 
   function camPinHtml(verified){
@@ -217,7 +121,7 @@
     </div>`;
   }
 
-  function initMap(){
+  async function initMap(){
     if(typeof naver === 'undefined' || !naver.maps){
       mapErrorEl.style.display = 'block';
       mapErrorEl.textContent = '⚠ 네이버 지도 스크립트를 불러오지 못했습니다. Client ID 등록 도메인 설정을 확인해 주세요.';
@@ -232,14 +136,23 @@
       scaleControl: false
     });
 
-    // ---- CCTV 마커 ----
-    cctvList.forEach((cctv) => {
-      const saved = loadSavedPosition(cctv.id);
-      const lat = saved ? saved.lat : cctv.lat;
-      const lng = saved ? saved.lng : cctv.lng;
+    let cctvList;
+    try{
+      statusEl.textContent = 'CCTV 목록 불러오는 중…';
+      cctvList = await fetchCctvSpots();
+      if(cctvList.length === 0){
+        mapErrorEl.style.display = 'block';
+        mapErrorEl.textContent = '⚠ 등록된 CCTV 지점이 없어요. functions/scripts/seed-cctv-spots.js를 먼저 실행해주세요.';
+      }
+    }catch(err){
+      mapErrorEl.style.display = 'block';
+      mapErrorEl.textContent = '⚠ ' + err.message;
+      cctvList = [];
+    }
 
+    cctvList.forEach((cctv) => {
       const marker = new naver.maps.Marker({
-        position: new naver.maps.LatLng(lat, lng),
+        position: new naver.maps.LatLng(cctv.coords.lat, cctv.coords.lng),
         map: map,
         title: cctv.name,
         draggable: true,
@@ -261,7 +174,7 @@
             <p class="addr">${cctv.address}</p>
             <a class="open" href="${cctv.videoUrl}" target="_blank" rel="noopener">실시간 화면 새 창으로 열기</a>
             <div>${badge}</div>
-            <p class="hint">📍 위치 추정치 — 드래그로 보정</p>
+            <p class="hint">📍 ${cctv.positionSource === 'corrected' ? '위치 보정됨' : '위치 추정치 — 드래그로 보정'}</p>
           </div>`,
         borderWidth: 0,
         backgroundColor: 'transparent',
@@ -270,9 +183,7 @@
       });
 
       naver.maps.Event.addListener(marker, 'click', () => {
-        // 클릭 즉시 새 창으로 실시간 화면 오픈
         window.open(cctv.videoUrl, '_blank', 'noopener');
-        // 위치 확인용 정보창도 함께 표시
         if(infoWindow.getMap()){
           infoWindow.close();
         } else {
@@ -280,11 +191,20 @@
         }
       });
 
-      naver.maps.Event.addListener(marker, 'dragend', () => {
+      naver.maps.Event.addListener(marker, 'dragend', async () => {
         const pos = marker.getPosition();
-        savePosition(cctv.id, pos.lat(), pos.lng());
+        try{
+          await saveCorrectedPosition(cctv.id, pos.lat(), pos.lng());
+        }catch(err){
+          console.error(err);
+          alert('위치 저장에 실패했어요: ' + err.message);
+        }
       });
     });
+
+    if(cctvList.length > 0){
+      statusEl.textContent = '위치 확인 대기 중…';
+    }
 
     // ---- 내 위치 ----
     let meMarker = null;
@@ -307,13 +227,8 @@
 
       if(!meMarker){
         meMarker = new naver.maps.Marker({
-          position: latlng,
-          map: map,
-          icon: {
-            content: '<div class="me-dot"></div>',
-            size: new naver.maps.Size(16, 16),
-            anchor: new naver.maps.Point(8, 8)
-          }
+          position: latlng, map: map,
+          icon: { content: '<div class="me-dot"></div>', size: new naver.maps.Size(16, 16), anchor: new naver.maps.Point(8, 8) }
         });
         map.setCenter(latlng);
         map.setZoom(16);
@@ -323,13 +238,8 @@
 
       if(!accCircle){
         accCircle = new naver.maps.Circle({
-          map: map,
-          center: latlng,
-          radius: accuracy,
-          strokeColor: '#4ee6a6',
-          strokeWeight: 1,
-          fillColor: '#4ee6a6',
-          fillOpacity: 0.08
+          map: map, center: latlng, radius: accuracy,
+          strokeColor: '#4ee6a6', strokeWeight: 1, fillColor: '#4ee6a6', fillOpacity: 0.08
         });
       } else {
         accCircle.setCenter(latlng);
@@ -367,9 +277,7 @@
     start();
   }
 
-  // 네이버 지도 스크립트 로드 완료 후 실행
   window.addEventListener('load', () => {
-    // 스크립트가 비동기로 아직 안 끝났을 수 있어 약간의 유예 후 시도
     if(typeof naver !== 'undefined' && naver.maps){
       initMap();
     } else {
