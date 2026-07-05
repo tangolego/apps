@@ -3,15 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>현재 위치 · CCTV</title>
-<!-- 네이버 지도 API 로드 -->
+<title>실시간 CCTV 전체 현황</title>
 <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=cu551dcr6p&submodules=geocoder"></script>
 <style>
-  :root{ --bg: #0b0f0e; --panel: #10201a; --line: #1f3a2e; --accent: #4ee6a6; }
-  html,body{ margin:0; padding:0; height:100%; background:var(--bg); color:#d9f3e6; font-family: sans-serif; }
+  html,body{ margin:0; padding:0; height:100%; background:#0b0f0e; font-family: sans-serif; }
   #map{ width:100%; height:100vh; }
-  .info-window { padding:10px; border:1px solid var(--line); background: var(--panel); border-radius: 5px; }
-  .info-window a { color: var(--accent); text-decoration: none; font-weight: bold; }
+  
+  /* 이름표(정보창) 스타일 */
+  .info-window { 
+    padding:4px 8px; 
+    background: rgba(255, 255, 255, 0.95); 
+    border: 1px solid #333; 
+    border-radius: 4px; 
+    font-size: 11px;
+    font-weight: bold;
+    color: #000;
+    text-align: center;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+  }
+  .info-window a { color: #d32f2f; text-decoration: none; font-size: 10px; display: block; margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -32,40 +42,42 @@
     { id:'106', name:'말구리고개-3',       address:'경기도 용인시 수지구 동천동 689-73' }
   ];
 
-  const map = new naver.maps.Map('map', {
-    center: new naver.maps.LatLng(37.3010, 127.0790),
-    zoom: 14
-  });
+  // 수지꿈학교 중심 초기화
+  naver.maps.Service.geocode({ query: '경기 용인시 수지구 고기동 348-1' }, (status, response) => {
+    const center = status === naver.maps.Service.Status.OK 
+                   ? new naver.maps.LatLng(response.v2.addresses[0].y, response.v2.addresses[0].x)
+                   : new naver.maps.LatLng(37.3010, 127.0790);
 
-  function createMarker(cctv) {
-    naver.maps.Service.geocode({ query: cctv.address }, (status, response) => {
-      if (status === naver.maps.Service.Status.OK && response.v2.addresses.length > 0) {
-        const item = response.v2.addresses[0];
-        const marker = new naver.maps.Marker({
-          position: new naver.maps.LatLng(item.y, item.x),
-          map: map,
-          title: cctv.name
-        });
+    const map = new naver.maps.Map('map', { center: center, zoom: 15 });
 
-        // 링크 URL 구성
-        const linkUrl = `http://safe.yongin.go.kr/m/cctv_view.html?cn=${cctv.id}&page=&cd=2&ct=2&ns=`;
-        
-        const infoWindow = new naver.maps.InfoWindow({
-          content: `
-            <div class="info-window">
-              <b>${cctv.name}</b><br>
-              <a href="${linkUrl}" target="_blank">▶ CCTV 영상 보기</a>
-            </div>`
-        });
+    cctvList.forEach(cctv => {
+      naver.maps.Service.geocode({ query: cctv.address }, (status, response) => {
+        if (status === naver.maps.Service.Status.OK) {
+          const pos = new naver.maps.LatLng(response.v2.addresses[0].y, response.v2.addresses[0].x);
+          
+          const marker = new naver.maps.Marker({
+            position: pos,
+            map: map
+          });
 
-        naver.maps.Event.addListener(marker, 'click', () => {
+          const infoWindow = new naver.maps.InfoWindow({
+            content: `<div class="info-window">${cctv.name}<br><a href="http://safe.yongin.go.kr/m/cctv_view.html?cn=${cctv.id}&page=&cd=2&ct=2&ns=" target="_blank">[영상 바로가기]</a></div>`,
+            borderWidth: 0,
+            disableAnchor: true,
+            backgroundColor: 'transparent'
+          });
+
+          // 항상 표시
           infoWindow.open(map, marker);
-        });
-      }
-    });
-  }
 
-  cctvList.forEach(cctv => createMarker(cctv));
+          // 클릭 시에도 항상 표시 유지
+          naver.maps.Event.addListener(marker, 'click', () => {
+            infoWindow.open(map, marker);
+          });
+        }
+      });
+    });
+  });
 </script>
 </body>
 </html>
