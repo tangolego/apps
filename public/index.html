@@ -100,7 +100,7 @@
   #video-panel {
     position: fixed;
     left: 0; right: 0; bottom: 0;
-    height: 42vh;
+    height: 100vh;
     background: #000;
     z-index: 10000;
     display: flex;
@@ -123,6 +123,17 @@
   #video-panel-header .fallback-link {
     color: #8bb8ff; font-size: 12px; font-weight: 500; text-decoration: none; margin-left: 8px;
   }
+  .back-to-map-btn {
+    background: #3182f6;
+    border: none;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-left: 8px;
+  }
   #video-panel-close {
     background: none; border: none; color: #ffffff;
     font-size: 18px; line-height: 1; cursor: pointer; padding: 4px 8px;
@@ -138,9 +149,13 @@
 
 <div id="video-panel">
   <div id="video-panel-header">
-    <span id="video-panel-title">CCTV</span>
-    <span style="display:flex; align-items:center;">
-      <a id="video-panel-fallback" class="fallback-link" href="#" target="_blank">새 창에서 열기</a>
+    <span style="display:flex; align-items:center; margin-left:auto;">
+      <a id="video-panel-fallback" class="fallback-link" href="#" target="_blank">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px; margin-right:3px;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>새 창에서 열기
+      </a>
+      <button id="video-panel-back" class="back-to-map-btn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:4px;"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>처음 지도로 돌아가기
+      </button>
       <button id="video-panel-close" aria-label="닫기">✕</button>
     </span>
   </div>
@@ -158,9 +173,9 @@
   // ---- 하단 iframe 패널: 클릭 시 새 창 대신 화면 아래에서 영상을 띄움 ----
   const videoPanel = document.getElementById('video-panel');
   const videoIframe = document.getElementById('video-panel-iframe');
-  const videoTitle = document.getElementById('video-panel-title');
   const videoFallback = document.getElementById('video-panel-fallback');
   const videoCloseBtn = document.getElementById('video-panel-close');
+  const videoBackBtn = document.getElementById('video-panel-back');
   const schoolLogoEl = document.getElementById('school-logo-fixed');
   const mapEl = document.getElementById('map');
 
@@ -168,16 +183,18 @@
     // 컨테이너 크기 변경(transition) 이후 지도가 새 크기를 인식하도록 트리거
     setTimeout(() => {
       naver.maps.Event.trigger(map, 'resize');
+      if (openLabelIdx !== null) {
+        requestAnimationFrame(() => requestAnimationFrame(fitOpenLabel));
+      }
     }, 260);
   }
 
   function openVideoPanel(name, url) {
-    videoTitle.textContent = name;
     videoFallback.href = url;
     videoIframe.src = url;
     videoPanel.classList.add('open');
     schoolLogoEl.classList.add('hidden');
-    mapEl.style.height = 'calc(100vh - 42vh)';
+    mapEl.style.height = '0px';
     resizeMapAfterPanelChange();
   }
 
@@ -190,6 +207,7 @@
   }
 
   videoCloseBtn.addEventListener('click', closeVideoPanel);
+  videoBackBtn.addEventListener('click', closeVideoPanel);
 
   // 이름표 안의 "영상 보기" 링크는 동적으로 생성되므로, 문서 전체에 위임해서 클릭을 감지
   document.addEventListener('click', (e) => {
@@ -219,7 +237,12 @@
   function closeAllLabels() {
     placedMarkers.forEach((m) => {
       const el = document.getElementById('cctv-label-' + m.idx);
-      if (el) el.style.display = 'none';
+      if (el) {
+        el.style.display = 'none';
+        // 다음에 다시 열릴 때 원래 크기/위치부터 새로 계산하도록 초기화
+        el.style.fontSize = '';
+        el.style.transform = '';
+      }
     });
     openLabelIdx = null;
   }
@@ -232,8 +255,57 @@
     if (!wasOpen) {
       labelEl.style.display = 'block';
       openLabelIdx = idx;
+      // 표시된 다음 프레임에 화면 안에 맞도록 크기/위치를 계산
+      requestAnimationFrame(() => requestAnimationFrame(fitOpenLabel));
     }
   }
+
+  // 이름표를 화면(뷰포트) 안에 맞추는 함수.
+  // 1) 원래 크기로 그려본 뒤 화면보다 크면 폰트를 15%씩, 최대 6단계, 최소 10px까지 줄임
+  // 2) 그 다음 화면 밖으로 삐져나온 만큼만 이름표를 안쪽으로 이동 (점 위치는 그대로 둠)
+  const LABEL_FIT_MAX_STEPS = 6;
+  const LABEL_FIT_SHRINK_RATIO = 0.85; // 15%씩 축소
+  const LABEL_FIT_MIN_FONT_PX = 10;
+
+  function fitOpenLabel() {
+    if (openLabelIdx === null) return;
+    const labelEl = document.getElementById('cctv-label-' + openLabelIdx);
+    if (!labelEl || labelEl.style.display === 'none') return;
+
+    // 1) 원래 크기(인라인 스타일 초기화)부터 다시 시작
+    labelEl.style.transform = '';
+    labelEl.style.fontSize = '';
+
+    // 2) 화면보다 크면 단계적으로 폰트 축소
+    for (let step = 0; step < LABEL_FIT_MAX_STEPS; step++) {
+      const rect = labelEl.getBoundingClientRect();
+      const fitsWidth = rect.width <= window.innerWidth;
+      const fitsHeight = rect.height <= window.innerHeight;
+      if (fitsWidth && fitsHeight) break;
+
+      const currentPx = parseFloat(getComputedStyle(labelEl).fontSize);
+      const nextPx = Math.max(LABEL_FIT_MIN_FONT_PX, currentPx * LABEL_FIT_SHRINK_RATIO);
+      labelEl.style.fontSize = nextPx + 'px';
+      if (nextPx <= LABEL_FIT_MIN_FONT_PX) break; // 이미 최소 크기
+    }
+
+    // 3) 화면 밖으로 나간 만큼만 안쪽으로 이동 (점은 영향받지 않음)
+    const rect2 = labelEl.getBoundingClientRect();
+    let dx = 0;
+    let dy = 0;
+    if (rect2.left < 0) dx = -rect2.left;
+    else if (rect2.right > window.innerWidth) dx = window.innerWidth - rect2.right;
+    if (rect2.top < 0) dy = -rect2.top;
+    else if (rect2.bottom > window.innerHeight) dy = window.innerHeight - rect2.bottom;
+    if (dx !== 0 || dy !== 0) {
+      labelEl.style.transform = `translate(${dx}px, ${dy}px)`;
+    }
+  }
+
+  // 창 크기 변경 시, 열려 있는 이름표가 있으면 다시 계산
+  window.addEventListener('resize', () => {
+    requestAnimationFrame(() => requestAnimationFrame(fitOpenLabel));
+  });
 
   function placeMarker(pos, labelHtml, isSchool) {
     const idx = markerSeq++;
@@ -256,9 +328,27 @@
     placedMarkers.push({ pos, idx, isSchool });
   }
 
-  // 지도 이동/줌이 끝날 때마다 이름표 글자 크기만 갱신 (표시 여부는 클릭으로만 결정)
+  // 지도 이동/줌이 끝날 때마다 이름표 글자 크기 갱신 + 열려있는 이름표 재계산
   naver.maps.Event.addListener(map, 'idle', () => {
     updateLabelSize();
+    if (openLabelIdx !== null) {
+      requestAnimationFrame(() => requestAnimationFrame(fitOpenLabel));
+    }
+  });
+
+  // 드래그로 지도를 움직이는 도중에도(끝나기 전에) 실시간으로 이름표가
+  // 화면을 벗어나지 않도록 계속 재계산
+  naver.maps.Event.addListener(map, 'drag', () => {
+    if (openLabelIdx !== null) {
+      requestAnimationFrame(fitOpenLabel);
+    }
+  });
+
+  // 확대/축소가 진행되는 도중에도 실시간으로 재계산
+  naver.maps.Event.addListener(map, 'zoom_changed', () => {
+    if (openLabelIdx !== null) {
+      requestAnimationFrame(fitOpenLabel);
+    }
   });
 
   updateLabelSize();
@@ -295,7 +385,7 @@
       naver.maps.Service.geocode({ query: cctv.address }, (status, response) => {
         if (status === naver.maps.Service.Status.OK) {
           const pos = new naver.maps.LatLng(response.v2.addresses[0].y, response.v2.addresses[0].x);
-          const link = `https://safe.yongin.go.kr/m/cctv_view.html?cn=${cctv.id}&page=&cd=2&ct=2&ns=`;
+          const link = `http://safe.yongin.go.kr/m/cctv_view.html?cn=${cctv.id}&page=&cd=2&ct=2&ns=`;
           placeMarker(pos, `${cctv.name}<a href="${link}" class="video-link" data-url="${link}" data-name="${cctv.name}">영상 보기</a>`, false);
         }
         onGeocodeSettled();
