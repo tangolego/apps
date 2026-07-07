@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CCTV 주소 좌표 검증</title>
+<script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=cu551dcr6p&submodules=geocoder"></script>
+<style>
+  body { font-family: -apple-system, "Malgun Gothic", sans-serif; max-width: 900px; margin: 30px auto; padding: 0 16px; color: #222; }
+  h1 { font-size: 18px; }
+  p.desc { color: #666; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 16px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #eee; vertical-align: top; }
+  th { color: #888; font-size: 11px; border-bottom: 2px solid #ddd; }
+  .ok { color: #1D4ED8; }
+  .warn { color: #B45309; font-weight: 600; }
+  .fail { color: #e5484d; }
+  button { padding: 5px 10px; border-radius: 6px; border: 1px solid #3182F6; background: #3182F6; color: #fff; font-size: 12px; cursor: pointer; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button.secondary { background: #fff; color: #3182F6; }
+  #status { font-size: 13px; color: #666; margin-top: 8px; }
+  code { font-size: 11px; background: #f4f4f4; padding: 1px 4px; border-radius: 3px; }
+</style>
+</head>
+<body>
+  <h1>CCTV 지점 주소 → 좌표 검증</h1>
+  <p class="desc">
+    각 주소를 네이버 지오코딩으로 실제 좌표를 찾아서, 지금 Firestore(<code>/api/cctv-spots</code>)에
+    저장된 추정 좌표와 비교해요. 차이가 크면 "적용" 눌러서 지오코딩 결과로 덮어쓸 수 있어요.
+  </p>
+  <div id="status">지오코딩 준비 중...</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>이름</th>
+        <th>주소</th>
+        <th>지오코딩 결과</th>
+        <th>현재 저장값</th>
+        <th>차이</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <script>
+    const API_BASE = "/api";
+
+    const ADDRESSES = [
+      { id: 'ch57',  name: '고기동 제1경보국',   address: '경기도 용인시 수지구 고기동 229-14' },
+      { id: 'ch58',  name: '고기동 제2경보국',   address: '경기도 용인시 수지구 고기동 755-37' },
+      { id: 'ch62',  name: '고기계곡 제3경보국', address: '경기도 용인시 수지구 고기동 755-45' },
+      { id: 'ch63',  name: '고기계곡 제4경보국', address: '경기도 용인시 수지구 고기동 755-37' },
+      { id: 'ch73',  name: '동막천-고기계곡',    address: '경기도 용인시 수지구 고기동 755' },
+      { id: 'ch74',  name: '서분당 IC하부',      address: '경기도 용인시 수지구 고기동 755-45' },
+      { id: 'ch121', name: '고기교',             address: '경기도 용인시 수지구 고기동 755-45' },
+      { id: 'ch105', name: '말구리고개-2',       address: '경기도 용인시 수지구 고기동 340-7' },
+      { id: 'ch33',  name: '말구리고개-1',       address: '경기도 용인시 수지구 동천동 687-7' },
+      { id: 'ch106', name: '말구리고개-3',       address: '경기도 용인시 수지구 동천동 689-73' },
+    ];
+
+    function haversineMeters(lat1, lng1, lat2, lng2) {
+      const R = 6371000;
+      const toRad = (d) => (d * Math.PI) / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLng = toRad(lng2 - lng1);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(a));
+    }
+
+    function geocode(address) {
+      return new Promise((resolve) => {
+        naver.maps.Service.geocode({ query: address }, (status, response) => {
+          if (status !== naver.maps.Service.Status.OK || !response.v2.addresses.length) {
+            resolve(null);
+            return;
+          }
+          const { x, y } = response.v2.addresses[0]; // x=경도, y=위도
+          resolve({ lat: Number(y), lng: Number(x) });
+        });
+      });
+    }
+
+    async function fetchCurrentSpots() {
+      const res = await fetch(`${API_BASE}/cctv-spots`);
+      if (!res.ok) throw new Error('현재 좌표를 못 불러왔어요 (' + res.status + ')');
+      const spots = await res.json();
+      const byId = {};
+      spots.forEach((s) => (byId[s.id] = s));
+      return byId;
+    }
+
+    async function applyCorrection(id, lat, lng, btn) {
+      btn.disabled = true;
+      btn.textContent = '저장 중...';
+      try {
+        const res = await fetch(`${API_BASE}/cctv-spots/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat, lng }),
+        });
+        if (!res.ok) throw new Error('저장 실패 (' + res.status + ')');
+        btn.textContent = '✅ 적용됨';
+      } catch (err) {
+        btn.textContent = '실패';
+        btn.disabled = false;
+        alert(err.message);
+      }
+    }
+
+    const rowsEl = document.getElementById('rows');
+    const statusEl = document.getElementById('status');
+
+    async function run() {
+      if (typeof naver === 'undefined' || !naver.maps || !naver.maps.Service) {
+        statusEl.textContent = '⚠ 네이버 지도 스크립트를 불러오지 못했어요. Client ID / 도메인 등록을 확인해주세요.';
+        statusEl.className = 'fail';
+        return;
+      }
+
+      let current;
+      try {
+        current = await fetchCurrentSpots();
+      } catch (err) {
+        statusEl.textContent = '⚠ ' + err.message;
+        return;
+      }
+
+      let done = 0;
+      for (const item of ADDRESSES) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${item.name}</td><td>${item.address}</td><td colspan="3">지오코딩 중...</td>`;
+        rowsEl.appendChild(tr);
+
+        const geo = await geocode(item.address);
+        const stored = current[item.id];
+        done++;
+        statusEl.textContent = `지오코딩 중... (${done}/${ADDRESSES.length})`;
+
+        if (!geo) {
+          tr.innerHTML = `<td>${item.name}</td><td>${item.address}</td><td class="fail">지오코딩 실패</td><td>${stored ? `${stored.coords.lat}, ${stored.coords.lng}` : '없음'}</td><td>—</td><td></td>`;
+          continue;
+        }
+        if (!stored) {
+          tr.innerHTML = `<td>${item.name}</td><td>${item.address}</td><td>${geo.lat.toFixed(6)}, ${geo.lng.toFixed(6)}</td><td class="fail">Firestore에 없음(id 불일치?)</td><td>—</td><td></td>`;
+          continue;
+        }
+
+        const dist = Math.round(haversineMeters(geo.lat, geo.lng, stored.coords.lat, stored.coords.lng));
+        const diffClass = dist > 300 ? 'fail' : dist > 80 ? 'warn' : 'ok';
+        const diffLabel = dist > 300 ? '⚠ 많이 다름' : dist > 80 ? '차이 있음' : '거의 일치';
+
+        tr.innerHTML = `
+          <td>${item.name}</td>
+          <td>${item.address}</td>
+          <td>${geo.lat.toFixed(6)}, ${geo.lng.toFixed(6)}</td>
+          <td>${stored.coords.lat.toFixed(6)}, ${stored.coords.lng.toFixed(6)}<br><span style="color:#999;font-size:11px;">(${stored.positionSource === 'corrected' ? '보정됨' : '추정치'})</span></td>
+          <td class="${diffClass}">${dist}m — ${diffLabel}</td>
+          <td><button data-id="${item.id}" data-lat="${geo.lat}" data-lng="${geo.lng}">지오코딩 값 적용</button></td>
+        `;
+        tr.querySelector('button').addEventListener('click', (e) => {
+          applyCorrection(item.id, geo.lat, geo.lng, e.target);
+        });
+      }
+
+      statusEl.textContent = `완료 (${ADDRESSES.length}건). 차이가 큰(⚠) 항목부터 확인해보세요.`;
+    }
+
+    window.addEventListener('load', () => {
+      if (typeof naver !== 'undefined' && naver.maps) run();
+      else setTimeout(run, 400);
+    });
+  </script>
+</body>
+</html>

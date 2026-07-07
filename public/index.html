@@ -165,8 +165,8 @@
   <video id="video-panel-video" playsinline controls></video>
 </div>
 <script>
-  // 프로젝트 ID가 반영된 프록시 URL
-  const PROXY_URL = 'https://wifimap.cloudfunctions.net/proxy';
+  // Hosting 리라이트(/api/** -> api 함수)를 그대로 타므로, 같은 오리진의 상대경로면 충분해요.
+  const PROXY_URL = '/api/proxy';
 
   const BASE_ZOOM = 14;
   const BASE_FONT_PX = 32.4;
