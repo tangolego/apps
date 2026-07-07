@@ -6,7 +6,6 @@
 <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=cu551dcr6p&submodules=geocoder"></script>
 <style>
   html, body { margin:0; padding:0; height:100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  #map { width:100%; height:100vh; }
 
   /*
     --cctv-font-size: 지도 줌 레벨에 따라 JS(zoom_changed)가 실시간으로 갱신하는
@@ -29,6 +28,7 @@
   }
 
   .cctv-label {
+    display: none; /* 기본은 숨김. 마커 클릭 시에만 보이도록 JS가 전환 */
     padding: 0.5em 0.9em;
     background: #ffffff;
     border: 1px solid #e1e4e8;
@@ -70,6 +70,7 @@
     background: #3182f6; border: 2px solid #ffffff;
     box-shadow: 0 1px 4px rgba(0,0,0,0.3);
     flex-shrink: 0;
+    cursor: pointer;
   }
 
   .cctv-dot.school { background: #ff6b4a; width: 14px; height: 14px; }
@@ -85,12 +86,66 @@
     z-index: 9999;
     pointer-events: none; /* 지도 조작을 막지 않도록 */
     filter: drop-shadow(0 2px 6px rgba(0,0,0,0.35));
+    transition: opacity 0.2s ease;
+  }
+  #school-logo-fixed.hidden { opacity: 0; }
+
+  #map {
+    width: 100%;
+    height: 100vh;
+    transition: height 0.25s ease;
+  }
+
+  /* 영상 클릭 시 화면 하단에 뜨는 iframe 패널 */
+  #video-panel {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    height: 42vh;
+    background: #000;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(100%);
+    transition: transform 0.25s ease;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.4);
+  }
+  #video-panel.open { transform: translateY(0); }
+
+  #video-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px;
+    background: #191f28;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  #video-panel-header .fallback-link {
+    color: #8bb8ff; font-size: 12px; font-weight: 500; text-decoration: none; margin-left: 8px;
+  }
+  #video-panel-close {
+    background: none; border: none; color: #ffffff;
+    font-size: 18px; line-height: 1; cursor: pointer; padding: 4px 8px;
+  }
+  #video-panel iframe {
+    flex: 1; width: 100%; border: none; background: #000;
   }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <img id="school-logo-fixed" src="images/logo.svg" alt="수지꿈학교 로고" />
+
+<div id="video-panel">
+  <div id="video-panel-header">
+    <span id="video-panel-title">CCTV</span>
+    <span style="display:flex; align-items:center;">
+      <a id="video-panel-fallback" class="fallback-link" href="#" target="_blank">새 창에서 열기</a>
+      <button id="video-panel-close" aria-label="닫기">✕</button>
+    </span>
+  </div>
+  <iframe id="video-panel-iframe" src="" allow="autoplay"></iframe>
+</div>
 <script>
   const BASE_ZOOM = 14;
   const BASE_FONT_PX = 32.4; // 이전 10.8px의 3배
@@ -100,6 +155,51 @@
 
   const map = new naver.maps.Map('map', { zoom: BASE_ZOOM });
 
+  // ---- 하단 iframe 패널: 클릭 시 새 창 대신 화면 아래에서 영상을 띄움 ----
+  const videoPanel = document.getElementById('video-panel');
+  const videoIframe = document.getElementById('video-panel-iframe');
+  const videoTitle = document.getElementById('video-panel-title');
+  const videoFallback = document.getElementById('video-panel-fallback');
+  const videoCloseBtn = document.getElementById('video-panel-close');
+  const schoolLogoEl = document.getElementById('school-logo-fixed');
+  const mapEl = document.getElementById('map');
+
+  function resizeMapAfterPanelChange() {
+    // 컨테이너 크기 변경(transition) 이후 지도가 새 크기를 인식하도록 트리거
+    setTimeout(() => {
+      naver.maps.Event.trigger(map, 'resize');
+    }, 260);
+  }
+
+  function openVideoPanel(name, url) {
+    videoTitle.textContent = name;
+    videoFallback.href = url;
+    videoIframe.src = url;
+    videoPanel.classList.add('open');
+    schoolLogoEl.classList.add('hidden');
+    mapEl.style.height = 'calc(100vh - 42vh)';
+    resizeMapAfterPanelChange();
+  }
+
+  function closeVideoPanel() {
+    videoPanel.classList.remove('open');
+    videoIframe.src = ''; // 영상/오디오 정지
+    schoolLogoEl.classList.remove('hidden');
+    mapEl.style.height = '100vh';
+    resizeMapAfterPanelChange();
+  }
+
+  videoCloseBtn.addEventListener('click', closeVideoPanel);
+
+  // 이름표 안의 "영상 보기" 링크는 동적으로 생성되므로, 문서 전체에 위임해서 클릭을 감지
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('.video-link');
+    if (!link) return;
+    e.preventDefault();
+    e.stopPropagation(); // 마커 클릭(이름표 토글)과 겹치지 않도록
+    openVideoPanel(link.dataset.name, link.dataset.url);
+  });
+
   // 줌 레벨이 바뀔 때마다 이름표 글자 크기를 같이 조정
   function updateLabelSize() {
     const zoom = map.getZoom();
@@ -108,16 +208,37 @@
     document.documentElement.style.setProperty('--cctv-font-size', size.toFixed(1) + 'px');
   }
 
-  // 생성된 모든 마커 정보를 모아두고, 겹침 해소 시 사용
+  // 생성된 모든 마커 정보를 모아두고, 이름표 토글 시 사용
   const placedMarkers = []; // { pos, idx, isSchool }
   let pendingGeocodes = 0;
   let markerSeq = 0;
-  let rotationTimers = []; // 겹치는 그룹의 번갈아-표시 타이머들
+
+  // 현재 열려 있는(이름표가 보이는) 마커 idx. 한 번에 하나만 열리도록 관리.
+  let openLabelIdx = null;
+
+  function closeAllLabels() {
+    placedMarkers.forEach((m) => {
+      const el = document.getElementById('cctv-label-' + m.idx);
+      if (el) el.style.display = 'none';
+    });
+    openLabelIdx = null;
+  }
+
+  function toggleLabel(idx) {
+    const labelEl = document.getElementById('cctv-label-' + idx);
+    if (!labelEl) return;
+    const wasOpen = openLabelIdx === idx;
+    closeAllLabels();
+    if (!wasOpen) {
+      labelEl.style.display = 'block';
+      openLabelIdx = idx;
+    }
+  }
 
   function placeMarker(pos, labelHtml, isSchool) {
     const idx = markerSeq++;
     const markerGraphic = `<div class="cctv-dot ${isSchool ? 'school' : ''}"></div>`;
-    new naver.maps.Marker({
+    const marker = new naver.maps.Marker({
       position: pos,
       map: map,
       icon: {
@@ -130,98 +251,22 @@
         anchor: new naver.maps.Point(0, 0)
       }
     });
+    // 마커(점) 클릭 시 해당 이름표만 보이도록 토글
+    naver.maps.Event.addListener(marker, 'click', () => toggleLabel(idx));
     placedMarkers.push({ pos, idx, isSchool });
   }
 
-  // 서로 겹치는 이름표들은 하나의 "그룹"으로 묶어서, 그룹 안에서 2초마다
-  // 한 번에 하나씩만 번갈아 보이게 함. 겹치지 않는 이름표는 항상 그대로 표시.
-  // 점/로고(정확한 위치 표시)는 이 처리와 무관하게 항상 그대로 유지됨.
-  function resolveOverlaps() {
-    // 이전 회차의 번갈아-표시 타이머들 정리
-    rotationTimers.forEach((t) => clearInterval(t));
-    rotationTimers = [];
-
-    if (placedMarkers.length === 0) return;
-    const projection = map.getProjection();
-
-    // 1) 각 라벨을 기본 간격(BASE_GAP_PX)에 뒀을 때의 화면상 사각형 계산
-    const items = [];
-    placedMarkers.forEach((m) => {
-      const labelEl = document.getElementById('cctv-label-' + m.idx);
-      const spacerEl = document.getElementById('cctv-spacer-' + m.idx);
-      if (!labelEl || !spacerEl) return; // 아직 렌더링 전이면 건너뜀
-
-      spacerEl.style.height = BASE_GAP_PX + 'px';
-      labelEl.style.display = ''; // 일단 모두 보이는 상태로 리셋 후 크기 측정
-
-      const pt = projection.fromCoordToOffset(m.pos);
-      const graphicSize = m.isSchool ? 44 : 14;
-      const rect = labelEl.getBoundingClientRect();
-      const bottom = pt.y - graphicSize - BASE_GAP_PX;
-      const top = bottom - rect.height;
-      const left = pt.x - rect.width / 2;
-      const right = pt.x + rect.width / 2;
-
-      items.push({ labelEl, left, right, top, bottom, group: -1 });
-    });
-
-    // 2) 겹치는 것끼리 그룹으로 묶기 (연결된 겹침 = 같은 그룹, Union-Find)
-    const n = items.length;
-    const parent = Array.from({ length: n }, (_, i) => i);
-    function find(x) { return parent[x] === x ? x : (parent[x] = find(parent[x])); }
-    function union(a, b) { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; }
-
-    for (let i = 0; i < n; i++) {
-      for (let j = i + 1; j < n; j++) {
-        const a = items[i], b = items[j];
-        const overlap = a.left < b.right && a.right > b.left && a.top < b.bottom && b.bottom > a.top;
-        if (overlap) union(i, j);
-      }
-    }
-
-    const groups = new Map(); // root -> [item, ...]
-    items.forEach((item, i) => {
-      const root = find(i);
-      if (!groups.has(root)) groups.set(root, []);
-      groups.get(root).push(item);
-    });
-
-    // 3) 그룹별로 처리: 1개면 계속 표시, 2개 이상이면 2초마다 하나씩 번갈아 표시
-    groups.forEach((group) => {
-      if (group.length <= 1) {
-        group.forEach((it) => (it.labelEl.style.display = ''));
-        return;
-      }
-      let current = 0;
-      function showOnly(idx) {
-        group.forEach((it, i) => {
-          it.labelEl.style.display = i === idx ? '' : 'none';
-        });
-      }
-      showOnly(current);
-      const timer = setInterval(() => {
-        current = (current + 1) % group.length;
-        showOnly(current);
-      }, 2000);
-      rotationTimers.push(timer);
-    });
-  }
-
-  // 지도 이동/줌이 끝날 때마다: 글자 크기 갱신 -> 겹침 재계산
+  // 지도 이동/줌이 끝날 때마다 이름표 글자 크기만 갱신 (표시 여부는 클릭으로만 결정)
   naver.maps.Event.addListener(map, 'idle', () => {
     updateLabelSize();
-    // 폰트 크기 변경이 DOM에 반영된 다음 프레임에 겹침 계산
-    requestAnimationFrame(() => requestAnimationFrame(resolveOverlaps));
   });
 
   updateLabelSize();
 
   const cctvList = [
     { id:'57',  name:'고기동 제1경보국', address:'경기도 용인시 수지구 고기동 229-14' },
-    { id:'58',  name:'고기동 제2경보국', address:'경기도 용인시 수지구 고기동 755-37' },
     { id:'62',  name:'고기계곡 제3경보국', address:'경기도 용인시 수지구 고기동 755-45' },
     { id:'63',  name:'고기계곡 제4경보국', address:'경기도 용인시 수지구 고기동 755-37' },
-    { id:'73',  name:'동막천-고기계곡', address:'경기도 용인시 수지구 고기동 755' },
     { id:'74',  name:'서분당 IC하부', address:'경기도 용인시 수지구 고기동 755-45' },
     { id:'121', name:'고기교', address:'경기도 용인시 수지구 고기동 755-73' },
     { id:'105', name:'말구리고개-2', address:'경기도 용인시 수지구 고기동 340-7' },
@@ -229,13 +274,9 @@
     { id:'106', name:'말구리고개-3', address:'경기도 용인시 수지구 동천동 689-73' }
   ];
 
-  const TOTAL_EXPECTED = cctvList.length + 1; // CCTV 10곳 + 학교 1곳
+  const TOTAL_EXPECTED = cctvList.length + 1; // CCTV 8곳 + 학교 1곳
   function onGeocodeSettled() {
     pendingGeocodes++;
-    if (pendingGeocodes >= TOTAL_EXPECTED) {
-      // 모든 마커가 배치된 뒤 최종적으로 한 번 더 겹침 해소
-      requestAnimationFrame(() => requestAnimationFrame(resolveOverlaps));
-    }
   }
 
   // 학교 위치 마커
@@ -254,8 +295,8 @@
       naver.maps.Service.geocode({ query: cctv.address }, (status, response) => {
         if (status === naver.maps.Service.Status.OK) {
           const pos = new naver.maps.LatLng(response.v2.addresses[0].y, response.v2.addresses[0].x);
-          const link = `http://safe.yongin.go.kr/m/cctv_view.html?cn=${cctv.id}&page=&cd=2&ct=2&ns=`;
-          placeMarker(pos, `${cctv.name}<a href="${link}" target="_blank">영상 보기</a>`, false);
+          const link = `https://safe.yongin.go.kr/m/cctv_view.html?cn=${cctv.id}&page=&cd=2&ct=2&ns=`;
+          placeMarker(pos, `${cctv.name}<a href="${link}" class="video-link" data-url="${link}" data-name="${cctv.name}">영상 보기</a>`, false);
         }
         onGeocodeSettled();
       });
