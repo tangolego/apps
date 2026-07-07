@@ -88,15 +88,7 @@
     cursor: pointer;
   }
 
-  /* 수지꿈학교 마커: 점 대신 실제 로고 이미지를 지도 좌표 위에 표시 */
-  .cctv-school-logo {
-    display: block;
-    width: 32px;
-    height: 44.6px; /* 로고 원본 비율(631:880) 유지 */
-    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4));
-    flex-shrink: 0;
-    cursor: pointer;
-  }
+  .cctv-dot.school { width: 30px; height: 19px; color: #ff6b4a; }
 
   /* 수지꿈학교 로고: 지도 위 마커가 아니라, 화면 하단에 항상 고정되는 오버레이.
      지도를 움직이거나 확대/축소해도 절대 같이 움직이지 않음. */
@@ -426,11 +418,9 @@
 
   function placeMarker(pos, labelHtml, isSchool) {
     const idx = markerSeq++;
-    // 수지꿈학교는 점 대신 실제 로고 이미지, 나머지 CCTV는 콩알탄 모양(가운데 둥근 알맹이 + 양쪽 비틀린 종이 끝)
-    const markerGraphic = isSchool
-      ? `<img class="cctv-school-logo" src="images/logo.svg" alt="수지꿈학교 로고" />`
-      : `
-      <svg class="cctv-dot" viewBox="0 0 22 14" xmlns="http://www.w3.org/2000/svg">
+    // 콩알탄 모양: 가운데 둥근 알맹이 + 양쪽에 비틀린 종이 끝(삼각형)
+    const markerGraphic = `
+      <svg class="cctv-dot ${isSchool ? 'school' : ''}" viewBox="0 0 22 14" xmlns="http://www.w3.org/2000/svg">
         <path d="M1 7 L6.5 2.5 L6.5 11.5 Z" fill="currentColor" stroke="#ffffff" stroke-width="1" stroke-linejoin="round"/>
         <path d="M21 7 L15.5 2.5 L15.5 11.5 Z" fill="currentColor" stroke="#ffffff" stroke-width="1" stroke-linejoin="round"/>
         <circle cx="11" cy="7" r="5.2" fill="currentColor" stroke="#ffffff" stroke-width="1.4"/>
