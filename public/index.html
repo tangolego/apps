@@ -260,23 +260,19 @@
     }, 260);
   }
 
-  const STREAM_HOSTS = ['safe2', 'safe'];
-
-  function buildStreamUrl(cn, host) {
-    return `http://${host}.yongin.go.kr:1935/live/ch${cn}_s.stream/playlist.m3u8`;
+  // 스트림은 이제 HTTPS 프록시(Firebase Function)를 거쳐서 받아온다.
+  // 이러면 (1) HTTP 스트림을 HTTPS 페이지에서 재생 못 하는 iOS WebKit 믹스드 콘텐츠
+  // 차단을 피할 수 있고, (2) safe2/safe 호스트 재시도도 서버 쪽에서 처리되므로
+  // 클라이언트 코드가 단순해진다.
+  function buildStreamUrl(cn) {
+    return `/hlsProxy/ch${cn}_s.stream/playlist.m3u8`;
   }
 
   let currentPlayCn = null;
 
-  function attachErrorFallback(cn, hostIndex) {
-    const nextHostIndex = hostIndex + 1;
-    if (nextHostIndex >= STREAM_HOSTS.length) return;
-    tryPlayWithHost(cn, nextHostIndex);
-  }
-
-  function tryPlayWithHost(cn, hostIndex) {
-    const host = STREAM_HOSTS[hostIndex];
-    const streamUrl = buildStreamUrl(cn, host);
+  function playStream(cn) {
+    currentPlayCn = cn;
+    const streamUrl = buildStreamUrl(cn);
 
     if (hlsInstance) {
       hlsInstance.destroy();
@@ -289,31 +285,18 @@
     updateUnmuteIcon();
 
     if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-      const onNativeError = () => {
-        videoEl.removeEventListener('error', onNativeError);
-        if (currentPlayCn === cn) attachErrorFallback(cn, hostIndex);
-      };
-      videoEl.addEventListener('error', onNativeError, { once: true });
+      // iOS Safari/Chrome(WebKit) 네이티브 HLS 재생
       videoEl.src = streamUrl;
       videoEl.play().catch(() => {});
     } else if (window.Hls && window.Hls.isSupported()) {
+      // 그 외(Android Chrome, 데스크톱 등) HLS.js로 재생
       hlsInstance = new Hls();
       hlsInstance.loadSource(streamUrl);
       hlsInstance.attachMedia(videoEl);
       hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
         videoEl.play().catch(() => {});
       });
-      hlsInstance.on(Hls.Events.ERROR, (event, data) => {
-        if (data.fatal && currentPlayCn === cn) {
-          attachErrorFallback(cn, hostIndex);
-        }
-      });
     }
-  }
-
-  function playStream(cn) {
-    currentPlayCn = cn;
-    tryPlayWithHost(cn, 0);
   }
 
   function stopStream() {
