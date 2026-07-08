@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
 <title>고기리 진출입 실시간 CCTV</title>
 <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=cu551dcr6p&submodules=geocoder"></script>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
@@ -114,7 +115,11 @@
   #video-panel.open { transform: translateY(0); }
 
   #video-panel-header {
-    display: flex; align-items: center; justify-content: space-between;
+    display: flex; align-items: center;
+    flex-wrap: wrap; /* 좁은 화면에서 넘치면 다음 줄로 내려가도록 (화면 밖으로 사라지는 것 방지) */
+    justify-content: flex-end;
+    row-gap: 6px;
+    column-gap: 4px;
     padding: 8px 12px;
     background: #191f28;
     color: #ffffff;
@@ -122,8 +127,20 @@
     font-weight: 700;
     flex-shrink: 0;
   }
+  #video-panel-header > span {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 6px;
+    column-gap: 4px;
+    width: 100%; /* margin-left:auto 대신, 부모가 이미 오른쪽 정렬을 담당 */
+    margin-left: 0 !important;
+  }
   #video-panel-header .fallback-link {
-    color: #8bb8ff; font-size: 12px; font-weight: 500; text-decoration: none; margin-left: 8px;
+    color: #8bb8ff; font-size: 12px; font-weight: 500; text-decoration: none;
+    white-space: nowrap;
+    padding: 4px 2px; /* 탭 히트 영역 확보 */
   }
   .back-to-map-btn {
     background: #3182f6;
@@ -134,7 +151,7 @@
     padding: 6px 10px;
     border-radius: 6px;
     cursor: pointer;
-    margin-left: 8px;
+    white-space: nowrap;
   }
   #video-panel-close {
     background: none; border: none; color: #ffffff;
@@ -165,9 +182,6 @@
   <video id="video-panel-video" playsinline controls></video>
 </div>
 <script>
-  // Hosting 리라이트(/api/** -> api 함수)를 그대로 타므로, 같은 오리진의 상대경로면 충분해요.
-  const PROXY_URL = '/api/proxy';
-
   const BASE_ZOOM = 14;
   const BASE_FONT_PX = 32.4;
   const MIN_FONT_PX = 15.9;
@@ -198,8 +212,7 @@
   const STREAM_HOSTS = ['safe2', 'safe'];
 
   function buildStreamUrl(cn, host) {
-    const originalUrl = `http://${host}.yongin.go.kr:1935/live/ch${cn}_s.stream/playlist.m3u8`;
-    return `${PROXY_URL}?url=${encodeURIComponent(originalUrl)}`;
+    return `http://${host}.yongin.go.kr:1935/live/ch${cn}_s.stream/playlist.m3u8`;
   }
 
   let currentPlayCn = null;
@@ -305,6 +318,7 @@
   const placedMarkers = [];
   let pendingGeocodes = 0;
   let markerSeq = 0;
+
   let openLabelIdx = null;
 
   function closeAllLabels() {
@@ -431,22 +445,20 @@
 
   updateLabelSize();
 
+  // 지오코딩 대신 알고 있는 위도/경도를 직접 사용 (33번은 실제 페이지 소스에서
+  // 확인된 값으로 교체함; 나머지는 이전에 확인된 값 그대로)
   const cctvList = [
-    { id:'57',  name:'고기동 제1경보국', address:'경기도 용인시 수지구 고기동 229-14' },
-    { id:'62',  name:'고기계곡 제3경보국', address:'경기도 용인시 수지구 고기동 755-45' },
-    { id:'63',  name:'고기계곡 제4경보국', address:'경기도 용인시 수지구 고기동 755-37' },
-    { id:'74',  name:'서분당 IC하부', address:'경기도 용인시 수지구 고기동 755-45' },
-    { id:'121', name:'고기교', address:'경기도 용인시 수지구 고기동 755-73' },
-    { id:'105', name:'말구리고개-2', address:'경기도 용인시 수지구 고기동 340-7' },
-    { id:'33',  name:'말구리고개-1', address:'경기도 용인시 수지구 동천동 687-7' },
-    { id:'106', name:'말구리고개-3', address:'경기도 용인시 수지구 동천동 689-73' }
+    { id:'57',  name:'고기동 제1경보국',   lat:37.368686, lng:127.050478 },
+    { id:'62',  name:'고기계곡 제3경보국', lat:37.359913, lng:127.055148 },
+    { id:'63',  name:'고기계곡 제4경보국', lat:37.367096, lng:127.050518 },
+    { id:'74',  name:'서분당 IC하부',      lat:37.359930, lng:127.064237 },
+    { id:'121', name:'고기교',             lat:37.359094, lng:127.067105 },
+    { id:'105', name:'말구리고개-2',       lat:37.362705, lng:127.067645 },
+    { id:'33',  name:'말구리고개-1',       lat:37.345115, lng:127.059211 }, // 실제 소스 확인값
+    { id:'106', name:'말구리고개-3',       lat:37.364376, lng:127.066496 }
   ];
 
-  const TOTAL_EXPECTED = cctvList.length + 1;
-  function onGeocodeSettled() {
-    pendingGeocodes++;
-  }
-
+  // 학교 위치 마커 (지오코딩 유지 — 좌표를 모르므로)
   naver.maps.Service.geocode({ query: '경기도 용인시 수지구 고기동 347-30' }, (status, response) => {
     if (status === naver.maps.Service.Status.OK) {
       const pos = new naver.maps.LatLng(response.v2.addresses[0].y, response.v2.addresses[0].x);
@@ -457,20 +469,13 @@
         true
       );
     }
-    onGeocodeSettled();
   });
 
-  cctvList.forEach((cctv, i) => {
-    setTimeout(() => {
-      naver.maps.Service.geocode({ query: cctv.address }, (status, response) => {
-        if (status === naver.maps.Service.Status.OK) {
-          const pos = new naver.maps.LatLng(response.v2.addresses[0].y, response.v2.addresses[0].x);
-          const link = `http://safe.yongin.go.kr/m/cctv_view.html?cn=${cctv.id}&page=&cd=2&ct=2&ns=`;
-          placeMarker(pos, `${cctv.name}<a href="${link}" class="video-link" data-url="${link}" data-name="${cctv.name}" data-cn="${cctv.id}">영상 보기</a>`, false);
-        }
-        onGeocodeSettled();
-      });
-    }, i * 250);
+  // CCTV 마커 생성 (좌표가 이미 있으므로 지오코딩 없이 즉시 생성)
+  cctvList.forEach((cctv) => {
+    const pos = new naver.maps.LatLng(cctv.lat, cctv.lng);
+    const link = `http://safe.yongin.go.kr/m/cctv_view.html?cn=${cctv.id}&page=&cd=2&ct=2&ns=`;
+    placeMarker(pos, `${cctv.name}<a href="${link}" class="video-link" data-url="${link}" data-name="${cctv.name}" data-cn="${cctv.id}">영상 보기</a>`, false);
   });
 </script>
 </body>

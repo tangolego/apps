@@ -19,6 +19,10 @@ setGlobalOptions({ region: "asia-northeast3", maxInstances: 10 }); // 서울 리
 const app = express();
 app.use(express.json());
 const api = express.Router();
+// Hosting 리라이트를 거치면 원래 경로(/api/...)가 그대로 전달되고,
+// Cloud Functions 주소를 직접 호출하면 함수 이름(api) 세그먼트가 빠진 채(/...) 전달된다.
+// 두 경우 다 동작하도록 같은 라우터를 루트와 /api 양쪽에 등록한다.
+app.use(api);
 app.use("/api", api);
 
 // ---------------------------------------------------------------------------
