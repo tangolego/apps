@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>고기리 진출입 실시간 CCTV</title>
+    
+    <!-- 네이버 지도 API (공식 파라미터 ncpClientId 사용) -->
+    <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=cu551dcr6p&submodules=geocoder"></script>
+    
+    <!-- HLS 스트리밍을 위한 라이브러리 -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+    
+    <style>
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+        #map { width: 100%; height: 100%; }
+        
+        /* 영상 오버레이 스타일 */
+        #video-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 320px;
+            background: black;
+            border: 2px solid #fff;
+            z-index: 100;
+        }
+        video { width: 100%; }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <!-- CCTV 영상 표시 영역 -->
+    <div id="video-container">
+        <video id="video" controls autoplay muted></video>
+    </div>
+
+    <script>
+        // 1. 지도 초기화
+        var map = new naver.maps.Map('map', {
+            center: new naver.maps.LatLng(37.35, 127.05), // 고기리 인근 좌표
+            zoom: 14
+        });
+
+        // 2. HLS 영상 재생 로직
+        var video = document.getElementById('video');
+        var videoSrc = 'YOUR_HLS_STREAM_URL'; // 실제 CCTV HLS 주소 입력
+
+        if (Hls.isSupported()) {
+            var hls = new Hls();
+            hls.loadSource(videoSrc);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                video.play();
+            });
+        }
+    </script>
+</body>
+</html>
