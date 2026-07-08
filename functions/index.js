@@ -263,3 +263,4 @@ function toClientSpot(doc) {
 }
 
 exports.api = onRequest(app);
+exports.hlsProxy = require('./hlsProxy').hlsProxy;

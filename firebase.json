@@ -4,6 +4,13 @@
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       {
+        "source": "/hlsProxy/**",
+        "function": {
+          "functionId": "hlsProxy",
+          "region": "asia-northeast3"
+        }
+      },
+      {
         "source": "/api/**",
         "function": {
           "functionId": "api",
