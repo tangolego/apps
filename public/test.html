@@ -2,60 +2,85 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>고기리 진출입 실시간 CCTV</title>
-    
-    <!-- 네이버 지도 API (공식 파라미터 ncpClientId 사용) -->
-    <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=cu551dcr6p&submodules=geocoder"></script>
-    
-    <!-- HLS 스트리밍을 위한 라이브러리 -->
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
-    
+    <title>내 주변 와이파이 지도</title>
+    <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=cu551dcr6p&submodules=geocoder"></script>
     <style>
-        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; }
         #map { width: 100%; height: 100%; }
-        
-        /* 영상 오버레이 스타일 */
-        #video-container {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            width: 320px;
-            background: black;
-            border: 2px solid #fff;
-            z-index: 100;
-        }
-        video { width: 100%; }
     </style>
 </head>
 <body>
-
     <div id="map"></div>
 
-    <!-- CCTV 영상 표시 영역 -->
-    <div id="video-container">
-        <video id="video" controls autoplay muted></video>
-    </div>
-
     <script>
-        // 1. 지도 초기화
+        // 1. 지도 초기화 (기본 중심: 임시 좌표)
         var map = new naver.maps.Map('map', {
-            center: new naver.maps.LatLng(37.35, 127.05), // 고기리 인근 좌표
-            zoom: 14
+            center: new naver.maps.LatLng(37.5666805, 126.9784147),
+            zoom: 15
         });
 
-        // 2. HLS 영상 재생 로직
-        var video = document.getElementById('video');
-        var videoSrc = 'YOUR_HLS_STREAM_URL'; // 실제 CCTV HLS 주소 입력
-
-        if (Hls.isSupported()) {
-            var hls = new Hls();
-            hls.loadSource(videoSrc);
-            hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                video.play();
+        // 2. 현재 위치 받아서 지도 중앙으로 설정
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                var lat = position.coords.latitude;
+                var lng = position.coords.longitude;
+                var currentPos = new naver.maps.LatLng(lat, lng);
+                
+                // 지도의 중심을 현재 위치로 이동
+                map.setCenter(currentPos);
+                
+                // 내 위치를 나타내는 빨간색 원 마커 추가
+                new naver.maps.Marker({
+                    position: currentPos,
+                    map: map,
+                    title: "현재 내 위치",
+                    icon: {
+                        content: '<div style="width:14px;height:14px;background:red;border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.5);"></div>',
+                        anchor: new naver.maps.Point(7, 7)
+                    }
+                });
+            }, function(error) {
+                console.error("위치 정보를 가져올 수 없습니다.", error);
             });
         }
+
+        // 3. CSV 파일 불러와서 와이파이 마커 표시
+        // HTML 파일과 동일한 경로에 'wifi_data.csv'가 있어야 합니다.
+        fetch('wifi_data.csv')
+            .then(response => response.text())
+            .then(csvText => {
+                var rows = csvText.split('\n');
+                
+                // 첫 줄(헤더)을 제외하고 데이터 반복
+                for (var i = 1; i < rows.length; i++) {
+                    if (!rows[i].trim()) continue; // 빈 줄 건너뛰기
+                    
+                    var cols = rows[i].split(',');
+                    
+                    // CSV 컬럼 순서에 맞게 인덱스(0, 1, 2, 3...)를 수정해 주세요.
+                    // 예시: 0=설치장소명, 1=WGS84위도, 2=WGS84경도, 3=와이파이SSID
+                    var placeName = cols[0];
+                    var lat = parseFloat(cols[1]); 
+                    var lng = parseFloat(cols[2]);
+                    var ssid = cols[3];
+
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        var marker = new naver.maps.Marker({
+                            position: new naver.maps.LatLng(lat, lng),
+                            map: map,
+                            title: placeName
+                        });
+
+                        // 마커 클릭 시 정보 알림창
+                        (function(marker, placeName, ssid) {
+                            naver.maps.Event.addListener(marker, 'click', function() {
+                                alert("장소: " + placeName + "\nSSID: " + ssid);
+                            });
+                        })(marker, placeName, ssid);
+                    }
+                }
+            })
+            .catch(error => console.error("CSV 파일을 불러오는 중 오류 발생:", error));
     </script>
 </body>
 </html>
