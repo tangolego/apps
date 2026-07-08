@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "wifimap-852eb"
+    "default": "wifimap-852eb",
+    "cctv": "cctv-25804"
   }
 }
