@@ -270,6 +270,14 @@
 
   let currentPlayCn = null;
 
+  // 첫 play() 시도가 (아직 데이터가 충분히 안 쌓여서) 조용히 실패하는 경우가 있어서,
+  // 실제로 재생 가능해지는 시점(canplay)에 한 번 더 시도한다.
+  function attemptPlay() {
+    videoEl.play().catch(() => {});
+  }
+  videoEl.addEventListener('canplay', attemptPlay);
+  videoEl.addEventListener('loadeddata', attemptPlay);
+
   function playStream(cn) {
     currentPlayCn = cn;
     const streamUrl = buildStreamUrl(cn);
@@ -287,15 +295,13 @@
     if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
       // iOS Safari/Chrome(WebKit) 네이티브 HLS 재생
       videoEl.src = streamUrl;
-      videoEl.play().catch(() => {});
+      attemptPlay();
     } else if (window.Hls && window.Hls.isSupported()) {
       // 그 외(Android Chrome, 데스크톱 등) HLS.js로 재생
       hlsInstance = new Hls();
       hlsInstance.loadSource(streamUrl);
       hlsInstance.attachMedia(videoEl);
-      hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-        videoEl.play().catch(() => {});
-      });
+      hlsInstance.on(Hls.Events.MANIFEST_PARSED, attemptPlay);
     }
   }
 
