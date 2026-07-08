@@ -1,95 +1,89 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>고기리 진출입 실시간 CCTV</title>
-<script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=cu551dcr6p"></script>
-<script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
-<style>
-  html, body { margin:0; padding:0; height:100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  :root { --cctv-font-size: 32.4px; }
-  .cctv-overlay { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; }
-  .cctv-label { display: none; padding: 0.5em 0.9em; background: #ffffff; border: 1px solid #e1e4e8; border-radius: 0.6em; font-size: min(var(--cctv-font-size), 8vw); font-weight: 700; color: #191f24; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; line-height: 1.3; max-width: min(80vw, 640px); max-height: 70vh; overflow: hidden; white-space: normal; word-break: keep-all; box-sizing: border-box; }
-  .cctv-label a { color: #3182f6; text-decoration: none; display: block; margin-top: 0.3em; font-size: 0.4em; }
-  @font-face { font-family: 'KimNamyun'; src: url('https://cdn.jsdelivr.net/gh/fontbee/font@main/Yoondesign/KimNamyun.woff') format('woff'); font-weight: normal; font-style: normal; font-display: swap; }
-  .cctv-label-school { font-family: 'KimNamyun', sans-serif; font-size: min(calc(var(--cctv-font-size) / 2), 4vw); }
-  .cctv-spacer { width: 1px; height: 4px; flex-shrink: 0; }
-  .cctv-dot { display: block; width: 26px; height: 36px; color: #ec3a2e; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4)); flex-shrink: 0; cursor: pointer; }
-  .cctv-school-logo { display: block; width: 32px; height: 44.6px; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4)); flex-shrink: 0; cursor: pointer; }
-  #school-logo-fixed { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); height: 56px; z-index: 9999; pointer-events: none; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.35)); transition: opacity 0.2s ease; }
-  #school-logo-fixed.hidden { opacity: 0; }
-  #map { width: 100%; height: 100vh; transition: height 0.25s ease; }
-  #video-panel { position: fixed; left: 0; right: 0; bottom: 0; height: 100vh; background: #000; z-index: 10000; display: flex; flex-direction: column; transform: translateY(100%); transition: transform 0.25s ease; box-shadow: 0 -4px 16px rgba(0,0,0,0.4); }
-  #video-panel.open { transform: translateY(0); }
-  #video-panel-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #191f28; color: #ffffff; font-size: 14px; font-weight: 700; flex-shrink: 0; }
-  .back-to-map-btn { background: #3182f6; border: none; color: #ffffff; font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
-  #video-panel-close { background: none; border: none; color: #ffffff; font-size: 18px; cursor: pointer; }
-  #video-panel video { flex: 1; width: 100%; height: 100%; border: none; background: #000; object-fit: contain; }
-</style>
+    <meta charset="UTF-8">
+    <title>내 주변 와이파이 지도</title>
+    <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=cu551dcr6p&submodules=geocoder"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <style>
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+        #map { width: 100%; height: 100%; }
+    </style>
 </head>
 <body>
-<div id="map"></div>
-<img id="school-logo-fixed" src="images/logo.svg" alt="수지꿈학교 로고" />
-<div id="video-panel">
-  <div id="video-panel-header">
-    <button id="video-panel-back" class="back-to-map-btn">처음 지도로 돌아가기</button>
-    <button id="video-panel-close">✕</button>
-  </div>
-  <video id="video-panel-video" playsinline controls></video>
-</div>
+    <div id="map"></div>
 
-<script>
-  const map = new naver.maps.Map('map', { zoom: 14, center: new naver.maps.LatLng(37.36, 127.06) });
-  const videoPanel = document.getElementById('video-panel');
-  const videoEl = document.getElementById('video-panel-video');
-  const mapEl = document.getElementById('map');
-  let markerSeq = 0, openLabelIdx = null, hlsInstance = null;
+    <script>
+        // 1. 제공해주신 발급 키 세팅 완료
+        const firebaseConfig = {
+            apiKey: "AIzaSyDZT_SerkNiSBhVL7hYH7giIFB7qshIqNs",
+            authDomain: "wifimap-852eb.firebaseapp.com",
+            databaseURL: "https://wifimap-852eb-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "wifimap-852eb",
+            storageBucket: "wifimap-852eb.firebasestorage.app",
+            messagingSenderId: "237915873972",
+            appId: "1:237915873972:web:511d324850f1600f866de1",
+            measurementId: "G-BQBBHGTG3X"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-  const cctvList = [
-    { id:'57',  name:'고기동 제1경보국', lat:37.368686, lng:127.050478 },
-    { id:'62',  name:'고기계곡 제3경보국', lat:37.359913, lng:127.055148 },
-    { id:'63',  name:'고기계곡 제4경보국', lat:37.367096, lng:127.050518 },
-    { id:'74',  name:'서분당 IC하부', lat:37.35993, lng:127.064237 },
-    { id:'121', name:'고기교', lat:37.359094, lng:127.067105 },
-    { id:'105', name:'말구리고개-2', lat:37.362705, lng:127.067645 },
-    { id:'33',  name:'말구리고개-1', lat:37.357117, lng:127.072535 },
-    { id:'106', name:'말구리고개-3', lat:37.364376, lng:127.066496 }
-  ];
+        // 2. 지도 초기화
+        var map = new naver.maps.Map('map', {
+            center: new naver.maps.LatLng(37.3214, 127.0609), 
+            zoom: 14
+        });
 
-  function placeMarker(pos, labelHtml, isSchool) {
-    const idx = markerSeq++;
-    const marker = new naver.maps.Marker({
-      position: pos,
-      map: map,
-      icon: { content: `<div class="cctv-overlay"><div class="cctv-label${isSchool?' cctv-label-school':''}" id="cctv-label-${idx}">${labelHtml}</div><div class="cctv-spacer"></div>${isSchool?'<img class="cctv-school-logo" src="images/logo.svg" />':'<svg class="cctv-dot" viewBox="0 0 24 34"><path d="M12 0C5.373 0 0 5.373 0 12c0 9 12 22 12 22s12-13 12-22c0-6.627-5.373-12-12-12z" fill="currentColor"/><circle cx="12" cy="12" r="5" fill="#ffffff"/></svg>'}</div>`, anchor: new naver.maps.Point(0, 0) }
-    });
-    naver.maps.Event.addListener(marker, 'click', () => {
-        const labelEl = document.getElementById('cctv-label-' + idx);
-        const wasOpen = openLabelIdx === idx;
-        document.querySelectorAll('.cctv-label').forEach(el => el.style.display = 'none');
-        if(!wasOpen) { labelEl.style.display = 'block'; openLabelIdx = idx; } else { openLabelIdx = null; }
-    });
-  }
+        // 3. 현재 위치 GPS 읽기 및 내 위치 마커 표시
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                var lat = position.coords.latitude;
+                var lng = position.coords.longitude;
+                var currentPos = new naver.maps.LatLng(lat, lng);
+                
+                map.setCenter(currentPos);
+                
+                new naver.maps.Marker({
+                    position: currentPos,
+                    map: map,
+                    title: "현재 내 위치",
+                    icon: {
+                        content: '<div style="width:14px;height:14px;background:red;border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.5);"></div>',
+                        anchor: new naver.maps.Point(7, 7)
+                    }
+                });
+            });
+        }
 
-  // 학교 마커 및 CCTV 마커 즉시 배치
-  placeMarker(new naver.maps.LatLng(37.363, 127.050), `수지꿈학교<a href="https://www.instagram.com/sujiggumhaggyo/" class="school-link" target="_blank">인스타그램</a>`, true);
-  cctvList.forEach(cctv => {
-    const link = `http://safe.yongin.go.kr/m/cctv_view.html?cn=${cctv.id}&page=&cd=2&ct=2&ns=`;
-    placeMarker(new naver.maps.LatLng(cctv.lat, cctv.lng), `${cctv.name}<a href="#" onclick="openVideo('${cctv.id}'); return false;">영상 보기</a>`, false);
-  });
+        // 4. Realtime Database에서 와이파이 지점들 가져와 표시
+        db.ref('/').once('value').then((snapshot) => {
+            const data = snapshot.val();
+            if (!data) return;
 
-  function openVideo(cn) {
-    videoEl.src = `/api/proxy?url=${encodeURIComponent('http://safe.yongin.go.kr:1935/live/ch'+cn+'_s.stream/playlist.m3u8')}`;
-    videoPanel.classList.add('open');
-    mapEl.style.height = '0px';
-  }
+            data.forEach(item => {
+                if (!item) return;
 
-  document.getElementById('video-panel-close').addEventListener('click', () => {
-    videoPanel.classList.remove('open');
-    mapEl.style.height = '100vh';
-    videoEl.pause();
-  });
-  document.getElementById('video-panel-back').addEventListener('click', () => document.getElementById('video-panel-close').click());
-</script>
+                let placeName = item['설치장소명']; 
+                let ssid = item['와이파이SSID'];
+                let lat = parseFloat(item['WGS84위도']);
+                let lng = parseFloat(item['WGS84경도']);
+
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    let marker = new naver.maps.Marker({
+                        position: new naver.maps.LatLng(lat, lng),
+                        map: map,
+                        title: placeName
+                    });
+
+                    naver.maps.Event.addListener(marker, 'click', function() {
+                        alert("장소: " + placeName + "\nSSID: " + (ssid ? ssid : "정보 없음"));
+                    });
+                }
+            });
+        }).catch(error => console.error("데이터 로드 실패:", error));
+    </script>
 </body>
 </html>
