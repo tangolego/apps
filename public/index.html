@@ -97,6 +97,7 @@
   #map {
     width: 100%;
     height: 100vh;
+    height: 100dvh; /* 지원 브라우저에선 주소창 접힘/펼침을 반영한 실제 높이로 재계산 */
     transition: height 0.25s ease;
   }
 
@@ -104,6 +105,7 @@
     position: fixed;
     left: 0; right: 0; bottom: 0;
     height: 100vh;
+    height: 100dvh;
     background: #000;
     z-index: 10000;
     display: flex;
@@ -140,7 +142,8 @@
   #video-panel-header .fallback-link {
     color: #8bb8ff; font-size: 12px; font-weight: 500; text-decoration: none;
     white-space: nowrap;
-    padding: 4px 2px; /* 탭 히트 영역 확보 */
+    padding: 6px;
+    display: flex; align-items: center;
   }
   .back-to-map-btn {
     background: #3182f6;
@@ -152,14 +155,45 @@
     border-radius: 6px;
     cursor: pointer;
     white-space: nowrap;
+    display: flex; align-items: center;
   }
   #video-panel-close {
     background: none; border: none; color: #ffffff;
     font-size: 18px; line-height: 1; cursor: pointer; padding: 4px 8px;
   }
+
+  /* 좁은 화면(대부분의 폰)에서는 텍스트 라벨을 숨기고 아이콘만 남겨,
+     한 줄 안에 무조건 들어가도록 함 (줄바꿈에 기대지 않는 확실한 방식) */
+  @media (max-width: 480px) {
+    #video-panel-header .fallback-link .btn-label,
+    .back-to-map-btn .btn-label {
+      display: none;
+    }
+    #video-panel-header .fallback-link svg,
+    .back-to-map-btn svg {
+      margin-right: 0 !important;
+    }
+    #video-panel-header .fallback-link,
+    .back-to-map-btn {
+      padding: 8px;
+    }
+  }
   #video-panel video {
     flex: 1; width: 100%; height: 100%; border: none; background: #000;
     object-fit: contain;
+  }
+  #video-unmute-btn {
+    position: absolute;
+    right: 14px;
+    bottom: 14px;
+    z-index: 10001;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.55);
+    color: #ffffff;
+    font-size: 18px;
+    cursor: pointer;
   }
 </style>
 </head>
@@ -170,16 +204,17 @@
 <div id="video-panel">
   <div id="video-panel-header">
     <span style="display:flex; align-items:center; margin-left:auto;">
-      <a id="video-panel-fallback" class="fallback-link" href="#" target="_blank">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px; margin-right:3px;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>새 창에서 열기
+      <a id="video-panel-fallback" class="fallback-link" href="#" target="_blank" title="새 창에서 열기">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px; margin-right:3px;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg><span class="btn-label">새 창에서 열기</span>
       </a>
-      <button id="video-panel-back" class="back-to-map-btn">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:4px;"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>처음 지도로 돌아가기
+      <button id="video-panel-back" class="back-to-map-btn" title="처음 지도로 돌아가기">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:4px;"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg><span class="btn-label">처음 지도로 돌아가기</span>
       </button>
       <button id="video-panel-close" aria-label="닫기">✕</button>
     </span>
   </div>
-  <video id="video-panel-video" playsinline controls></video>
+  <video id="video-panel-video" playsinline muted controls></video>
+  <button id="video-unmute-btn" aria-label="음소거 해제">🔇</button>
 </div>
 <script>
   const BASE_ZOOM = 14;
@@ -195,8 +230,24 @@
   const videoFallback = document.getElementById('video-panel-fallback');
   const videoCloseBtn = document.getElementById('video-panel-close');
   const videoBackBtn = document.getElementById('video-panel-back');
+  const videoUnmuteBtn = document.getElementById('video-unmute-btn');
   const schoolLogoEl = document.getElementById('school-logo-fixed');
   const mapEl = document.getElementById('map');
+
+  // 모바일 자동재생 정책: 음소거 상태의 play()는 거의 모든 브라우저가 허용하지만,
+  // (클릭 → HLS 네트워크 요청 → play() 호출) 사이에 시간이 걸리면 사용자 제스처가
+  // 만료된 것으로 간주돼 소리 있는 자동재생은 차단되고 "취소" 아이콘이 뜸.
+  // 그래서 항상 음소거로 시작하고, 원하면 버튼으로 직접 해제하게 함.
+  videoEl.muted = true;
+  function updateUnmuteIcon() {
+    videoUnmuteBtn.textContent = videoEl.muted ? '🔇' : '🔊';
+  }
+  videoUnmuteBtn.addEventListener('click', () => {
+    videoEl.muted = !videoEl.muted;
+    updateUnmuteIcon();
+    videoEl.play().catch(() => {});
+  });
+  updateUnmuteIcon();
 
   let hlsInstance = null;
 
@@ -234,6 +285,8 @@
     videoEl.pause();
     videoEl.removeAttribute('src');
     videoEl.load();
+    videoEl.muted = true;
+    updateUnmuteIcon();
 
     if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
       const onNativeError = () => {
@@ -287,7 +340,7 @@
     videoPanel.classList.remove('open');
     stopStream();
     schoolLogoEl.classList.remove('hidden');
-    mapEl.style.height = '100vh';
+    mapEl.style.height = CSS.supports('height', '100dvh') ? '100dvh' : '100vh';
     resizeMapAfterPanelChange();
   }
 
