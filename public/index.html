@@ -260,6 +260,7 @@
     }, 260);
   }
 
+<<<<<<< HEAD
   // 스트림은 이제 HTTPS 프록시(Firebase Function)를 거쳐서 받아온다.
   // 이러면 (1) HTTP 스트림을 HTTPS 페이지에서 재생 못 하는 iOS WebKit 믹스드 콘텐츠
   // 차단을 피할 수 있고, (2) safe2/safe 호스트 재시도도 서버 쪽에서 처리되므로
@@ -518,6 +519,31 @@ const cctvList = [
     const pos = new naver.maps.LatLng(cctv.lat, cctv.lng);
     const link = `http://safe.yongin.go.kr/m/cctv_view.html?cn=${cctv.id}&page=&cd=2&ct=2&ns=`;
     placeMarker(pos, `${cctv.name}<a href="${link}" class="video-link" data-url="${link}" data-name="${cctv.name}" data-cn="${cctv.id}">영상 보기</a>`, false);
+=======
+  // 학교 위치 직접 지정
+  const schoolPos = new naver.maps.LatLng(37.3511496, 127.0502891);
+  map.setCenter(schoolPos);
+  placeMarker(schoolPos, '수지꿈학교', true);
+
+  // CCTV 마커 직접 생성
+  const cctvList = [
+    { id:'57',  name:'고기동 제1경보국',   lat:37.3619819, lng:127.0527963 },
+    { id:'62',  name:'고기계곡 제3경보국', lat:37.3599282, lng:127.0551361 },
+    { id:'63',  name:'고기계곡 제4경보국', lat:37.3576888, lng:127.0501041 },
+    { id:'74',  name:'서분당 IC하부',      lat:37.3599353, lng:127.0642269 },
+    { id:'121', name:'고기교',             lat:37.3590805, lng:127.0670650 },
+    { id:'105', name:'말구리고개-2',       lat:37.3504348, lng:127.0540409 },
+    { id:'33',  name:'말구리고개-1',       lat:37.3450988, lng:127.0592631 },
+    { id:'106', name:'말구리고개-3',       lat:37.3480158, lng:127.0563878 },
+    { id:'58',  name:'고기동 제2경보국',   lat:37.3590821, lng:127.0482802 }
+  ];
+
+  cctvList.forEach(cctv => {
+    const label = cctv.id
+      ? `${cctv.name}<a href="http://safe.yongin.go.kr/m/cctv_view.html?cn=${cctv.id}">영상 보기</a>`
+      : cctv.name; // cn 값이 없는 지점은 '영상 보기' 링크 없이 이름만 표시
+    placeMarker(new naver.maps.LatLng(cctv.lat, cctv.lng), label, false);
+>>>>>>> 0ec3df6 (fixed latlong)
   });
 </script>
 </body>
