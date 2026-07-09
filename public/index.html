@@ -260,7 +260,6 @@
     }, 260);
   }
 
-<<<<<<< HEAD
   // 스트림은 이제 HTTPS 프록시(Firebase Function)를 거쳐서 받아온다.
   // 이러면 (1) HTTP 스트림을 HTTPS 페이지에서 재생 못 하는 iOS WebKit 믹스드 콘텐츠
   // 차단을 피할 수 있고, (2) safe2/safe 호스트 재시도도 서버 쪽에서 처리되므로
@@ -488,44 +487,12 @@
 
   updateLabelSize();
 
-  // 지오코딩 대신 알고 있는 위도/경도를 직접 사용 (33번은 실제 페이지 소스에서
-  // 확인된 값으로 교체함; 나머지는 이전에 확인된 값 그대로)
-const cctvList = [
-    { id:'57',  name:'고기동 제1경보국',   lat:37.368686, lng:127.050478 },
-    { id:'62',  name:'고기계곡 제3경보국', lat:37.359913, lng:127.055148 },
-    { id:'63',  name:'고기계곡 제4경보국', lat:37.367096, lng:127.050518 },
-    { id:'74',  name:'서분당 IC하부',      lat:37.359930, lng:127.064237 },
-    { id:'121', name:'고기교',             lat:37.359094, lng:127.067105 },
-    { id:'105', name:'말구리고개-2',       lat:37.362705, lng:127.067645 },
-    { id:'33',  name:'말구리고개-1',       lat:37.345115, lng:127.059211 },
-    { id:'106', name:'말구리고개-3',       lat:37.364376, lng:127.066496 }
-  ];
-
-  // 학교 위치 마커 (지오코딩 유지 — 좌표를 모르므로)
-  //naver.maps.Service.geocode({ query: '경기도 용인시 수지구 고기동 347-30' }, (status, response) => {
-  //  if (status === naver.maps.Service.Status.OK) {
-  //    const pos = new naver.maps.LatLng(response.v2.addresses[0].y, response.v2.addresses[0].x);
-  //    map.setCenter(pos);
-  //    placeMarker(
-  //      pos,
-  //      `수지꿈학교<a href="https://www.instagram.com/sujiggumhaggyo/" class="school-link" target="_blank" rel="noopener">인스타그램</a>`,
-  //      true
-  //    );
-  //  }
-  //});
-
-  // CCTV 마커 생성 (좌표가 이미 있으므로 지오코딩 없이 즉시 생성)
-  cctvList.forEach((cctv) => {
-    const pos = new naver.maps.LatLng(cctv.lat, cctv.lng);
-    const link = `http://safe.yongin.go.kr/m/cctv_view.html?cn=${cctv.id}&page=&cd=2&ct=2&ns=`;
-    placeMarker(pos, `${cctv.name}<a href="${link}" class="video-link" data-url="${link}" data-name="${cctv.name}" data-cn="${cctv.id}">영상 보기</a>`, false);
-=======
-  // 학교 위치 직접 지정
+  // 수지꿈학교 위치를 직접 지정하고 지도 중심으로 설정
   const schoolPos = new naver.maps.LatLng(37.3511496, 127.0502891);
   map.setCenter(schoolPos);
   placeMarker(schoolPos, '수지꿈학교', true);
 
-  // CCTV 마커 직접 생성
+  // CCTV 마커 생성 (좌표가 이미 있으므로 지오코딩 없이 즉시 생성; 좌표는 최신 확인값으로 교체함)
   const cctvList = [
     { id:'57',  name:'고기동 제1경보국',   lat:37.3619819, lng:127.0527963 },
     { id:'62',  name:'고기계곡 제3경보국', lat:37.3599282, lng:127.0551361 },
@@ -538,12 +505,10 @@ const cctvList = [
     { id:'58',  name:'고기동 제2경보국',   lat:37.3590821, lng:127.0482802 }
   ];
 
-  cctvList.forEach(cctv => {
-    const label = cctv.id
-      ? `${cctv.name}<a href="http://safe.yongin.go.kr/m/cctv_view.html?cn=${cctv.id}">영상 보기</a>`
-      : cctv.name; // cn 값이 없는 지점은 '영상 보기' 링크 없이 이름만 표시
-    placeMarker(new naver.maps.LatLng(cctv.lat, cctv.lng), label, false);
->>>>>>> 0ec3df6 (fixed latlong)
+  cctvList.forEach((cctv) => {
+    const pos = new naver.maps.LatLng(cctv.lat, cctv.lng);
+    const link = `http://safe.yongin.go.kr/m/cctv_view.html?cn=${cctv.id}&page=&cd=2&ct=2&ns=`;
+    placeMarker(pos, `${cctv.name}<a href="${link}" class="video-link" data-url="${link}" data-name="${cctv.name}" data-cn="${cctv.id}">영상 보기</a>`, false);
   });
 </script>
 </body>
