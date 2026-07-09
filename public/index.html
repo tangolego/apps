@@ -4,60 +4,492 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
 <title>고기리 진출입 실시간 CCTV</title>
-<script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=cu551dcr6p"></script>
+<script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=cu551dcr6p&submodules=geocoder"></script>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
 <style>
   html, body { margin:0; padding:0; height:100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
   :root { --cctv-font-size: 64.8px; }
-  .cctv-overlay { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; }
-  .cctv-label { display: none; padding: 0.5em 0.9em; background: #ffffff; border: 1px solid #e1e4e8; border-radius: 0.6em; font-size: min(var(--cctv-font-size), 16vw); font-weight: 700; color: #191f24; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; line-height: 1.3; max-width: min(80vw, 640px); max-height: 70vh; overflow: hidden; white-space: normal; word-break: keep-all; overflow-wrap: break-word; box-sizing: border-box; }
-  .cctv-label a { color: #3182f6; text-decoration: none; display: block; margin-top: 0.3em; font-size: 0.4em; }
-  @font-face { font-family: 'KimNamyun'; src: url('https://cdn.jsdelivr.net/gh/fontbee/font@main/Yoondesign/KimNamyun.woff') format('woff'); font-weight: normal; font-style: normal; font-display: swap; }
-  .cctv-label-school { font-family: 'KimNamyun', sans-serif; font-size: min(calc(var(--cctv-font-size) / 2), 8vw); }
-  .cctv-spacer { width: 1px; height: 4px; flex-shrink: 0; }
-  .cctv-dot { display: block; width: 26px; height: 36px; color: #ec3a2e; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4)); flex-shrink: 0; cursor: pointer; }
-  .cctv-school-logo { display: block; width: 32px; height: 44.6px; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4)); flex-shrink: 0; cursor: pointer; }
-  #school-logo-fixed { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); height: 56px; z-index: 9999; pointer-events: none; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.35)); transition: opacity 0.2s ease; }
+
+  .cctv-overlay {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    display: flex; flex-direction: column; align-items: center;
+  }
+
+  .cctv-label {
+    display: none;
+    padding: 0.5em 0.9em;
+    background: #ffffff;
+    border: 1px solid #e1e4e8;
+    border-radius: 0.6em;
+    font-size: min(var(--cctv-font-size), 16vw);
+    font-weight: 700;
+    color: #191f24;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    text-align: center;
+    line-height: 1.3;
+    max-width: min(80vw, 640px);
+    max-height: 70vh;
+    overflow: hidden;
+    white-space: normal;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+    box-sizing: border-box;
+  }
+  .cctv-label a {
+    color: #3182f6;
+    text-decoration: none;
+    display: block;
+    margin-top: 0.3em;
+    font-size: 0.4em;
+  }
+
+  @font-face {
+    font-family: 'KimNamyun';
+    src: url('https://cdn.jsdelivr.net/gh/fontbee/font@main/Yoondesign/KimNamyun.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+  }
+  .cctv-label-school {
+    font-family: 'KimNamyun', sans-serif;
+    font-size: min(calc(var(--cctv-font-size) / 2), 8vw);
+  }
+
+  .cctv-spacer {
+    width: 1px;
+    height: 4px;
+    flex-shrink: 0;
+  }
+
+  .cctv-dot {
+    display: block;
+    width: 26px; height: 36px;
+    color: #ec3a2e;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4));
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .cctv-school-logo {
+    display: block;
+    width: 32px;
+    height: 44.6px;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4));
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  #school-logo-fixed {
+    position: fixed;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
+    height: 56px;
+    z-index: 9999;
+    pointer-events: none;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.35));
+    transition: opacity 0.2s ease;
+  }
   #school-logo-fixed.hidden { opacity: 0; }
-  #map { width: 100%; height: 100vh; height: 100dvh; transition: height 0.25s ease; }
-  #video-panel { position: fixed; left: 0; right: 0; bottom: 0; height: 100vh; height: 100dvh; background: #000; z-index: 10000; display: flex; flex-direction: column; transform: translateY(100%); transition: transform 0.25s ease; box-shadow: 0 -4px 16px rgba(0,0,0,0.4); }
+
+  #map {
+    width: 100%;
+    height: 100vh;
+    height: 100dvh; /* 지원 브라우저에선 주소창 접힘/펼침을 반영한 실제 높이로 재계산 */
+    transition: height 0.25s ease;
+  }
+
+  #video-panel {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    height: 100vh;
+    height: 100dvh;
+    background: #000;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(100%);
+    transition: transform 0.25s ease;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.4);
+  }
   #video-panel.open { transform: translateY(0); }
-  #video-panel-header { display: flex; align-items: center; justify-content: flex-end; row-gap: 6px; column-gap: 4px; padding: 8px 12px; background: #191f28; color: #ffffff; font-size: 14px; font-weight: 700; flex-shrink: 0; }
-  .back-to-map-btn { background: #3182f6; border: none; color: #ffffff; font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
-  #video-panel-close { background: none; border: none; color: #ffffff; font-size: 18px; line-height: 1; cursor: pointer; padding: 4px 8px; }
-  #video-panel video { flex: 1; width: 100%; height: 100%; border: none; background: #000; object-fit: contain; }
-  #video-unmute-btn { position: absolute; right: 14px; bottom: 14px; z-index: 10001; width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(0,0,0,0.55); color: #ffffff; font-size: 18px; cursor: pointer; }
+
+  #video-panel-header {
+    display: flex; align-items: center;
+    flex-wrap: wrap; /* 좁은 화면에서 넘치면 다음 줄로 내려가도록 (화면 밖으로 사라지는 것 방지) */
+    justify-content: flex-end;
+    row-gap: 6px;
+    column-gap: 4px;
+    padding: 8px 12px;
+    background: #191f28;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  #video-panel-header > span {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 6px;
+    column-gap: 4px;
+    width: 100%; /* margin-left:auto 대신, 부모가 이미 오른쪽 정렬을 담당 */
+    margin-left: 0 !important;
+  }
+  #video-panel-header .fallback-link {
+    color: #8bb8ff; font-size: 12px; font-weight: 500; text-decoration: none;
+    white-space: nowrap;
+    padding: 6px;
+    display: flex; align-items: center;
+  }
+  .back-to-map-btn {
+    background: #3182f6;
+    border: none;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    display: flex; align-items: center;
+  }
+  #video-panel-close {
+    background: none; border: none; color: #ffffff;
+    font-size: 18px; line-height: 1; cursor: pointer; padding: 4px 8px;
+  }
+
+  /* 좁은 화면(대부분의 폰)에서는 텍스트 라벨을 숨기고 아이콘만 남겨,
+     한 줄 안에 무조건 들어가도록 함 (줄바꿈에 기대지 않는 확실한 방식) */
+  @media (max-width: 480px) {
+    #video-panel-header .fallback-link .btn-label,
+    .back-to-map-btn .btn-label {
+      display: none;
+    }
+    #video-panel-header .fallback-link svg,
+    .back-to-map-btn svg {
+      margin-right: 0 !important;
+    }
+    #video-panel-header .fallback-link,
+    .back-to-map-btn {
+      padding: 8px;
+    }
+  }
+  #video-panel video {
+    flex: 1; width: 100%; height: 100%; border: none; background: #000;
+    object-fit: contain;
+  }
+  #video-unmute-btn {
+    position: absolute;
+    right: 14px;
+    bottom: 14px;
+    z-index: 10001;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.55);
+    color: #ffffff;
+    font-size: 18px;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <img id="school-logo-fixed" src="images/logo.svg" alt="수지꿈학교 로고" />
+
 <div id="video-panel">
   <div id="video-panel-header">
-    <button id="video-panel-back" class="back-to-map-btn">처음 지도로 돌아가기</button>
-    <button id="video-panel-close">✕</button>
+    <span style="display:flex; align-items:center; margin-left:auto;">
+      <a id="video-panel-fallback" class="fallback-link" href="#" target="_blank" title="새 창에서 열기">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px; margin-right:3px;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg><span class="btn-label">새 창에서 열기</span>
+      </a>
+      <button id="video-panel-back" class="back-to-map-btn" title="처음 지도로 돌아가기">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:4px;"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg><span class="btn-label">처음 지도로 돌아가기</span>
+      </button>
+      <button id="video-panel-close" aria-label="닫기">✕</button>
+    </span>
   </div>
   <video id="video-panel-video" playsinline muted controls></video>
-  <button id="video-unmute-btn">🔇</button>
+  <button id="video-unmute-btn" aria-label="음소거 해제">🔇</button>
 </div>
 <script>
-  const map = new naver.maps.Map('map', { zoom: 14 });
-  const videoPanel = document.getElementById('video-panel'), videoEl = document.getElementById('video-panel-video'), schoolLogoEl = document.getElementById('school-logo-fixed'), mapEl = document.getElementById('map');
-  
-  function placeMarker(pos, labelHtml, isSchool) {
-    new naver.maps.Marker({
-      position: pos, map: map,
-      icon: { content: `<div class="cctv-overlay"><div class="cctv-label${isSchool ? ' cctv-label-school' : ''}">${labelHtml}</div><div class="cctv-spacer"></div>${isSchool ? '<img class="cctv-school-logo" src="images/logo.svg"/>' : '<svg class="cctv-dot" viewBox="0 0 24 34"><path d="M12 0C5.373 0 0 5.373 0 12c0 9 12 22 12 22s12-13 12-22c0-6.627-5.373-12-12-12z" fill="currentColor"/><circle cx="12" cy="12" r="5" fill="#ffffff"/></svg>'}</div>`, anchor: new naver.maps.Point(0, 0) }
-    });
+  const BASE_ZOOM = 14;
+  const BASE_FONT_PX = 64.8;
+  const MIN_FONT_PX = 31.8;
+  const MAX_FONT_PX = 139.8;
+  const BASE_GAP_PX = 4;
+
+  const map = new naver.maps.Map('map', { zoom: BASE_ZOOM });
+
+  const videoPanel = document.getElementById('video-panel');
+  const videoEl = document.getElementById('video-panel-video');
+  const videoFallback = document.getElementById('video-panel-fallback');
+  const videoCloseBtn = document.getElementById('video-panel-close');
+  const videoBackBtn = document.getElementById('video-panel-back');
+  const videoUnmuteBtn = document.getElementById('video-unmute-btn');
+  const schoolLogoEl = document.getElementById('school-logo-fixed');
+  const mapEl = document.getElementById('map');
+
+  // 모바일 자동재생 정책: 음소거 상태의 play()는 거의 모든 브라우저가 허용하지만,
+  // (클릭 → HLS 네트워크 요청 → play() 호출) 사이에 시간이 걸리면 사용자 제스처가
+  // 만료된 것으로 간주돼 소리 있는 자동재생은 차단되고 "취소" 아이콘이 뜸.
+  // 그래서 항상 음소거로 시작하고, 원하면 버튼으로 직접 해제하게 함.
+  videoEl.muted = true;
+  function updateUnmuteIcon() {
+    videoUnmuteBtn.textContent = videoEl.muted ? '🔇' : '🔊';
+  }
+  videoUnmuteBtn.addEventListener('click', () => {
+    videoEl.muted = !videoEl.muted;
+    updateUnmuteIcon();
+    videoEl.play().catch(() => {});
+  });
+  updateUnmuteIcon();
+
+  let hlsInstance = null;
+
+  function resizeMapAfterPanelChange() {
+    setTimeout(() => {
+      naver.maps.Event.trigger(map, 'resize');
+      if (openLabelIdx !== null) {
+        requestAnimationFrame(() => requestAnimationFrame(fitOpenLabel));
+      }
+    }, 260);
   }
 
-  // 학교 위치 직접 지정
-  const schoolPos = new naver.maps.LatLng(37.345163, 127.059279);
-  map.setCenter(schoolPos);
-  placeMarker(schoolPos, '수지꿈학교', true);
+  // 스트림은 이제 HTTPS 프록시(Firebase Function)를 거쳐서 받아온다.
+  // 이러면 (1) HTTP 스트림을 HTTPS 페이지에서 재생 못 하는 iOS WebKit 믹스드 콘텐츠
+  // 차단을 피할 수 있고, (2) safe2/safe 호스트 재시도도 서버 쪽에서 처리되므로
+  // 클라이언트 코드가 단순해진다.
+  function buildStreamUrl(cn) {
+    return `/hlsProxy/ch${cn}_s.stream/playlist.m3u8`;
+  }
 
-  // CCTV 마커 직접 생성
-  const cctvList = [
+  let currentPlayCn = null;
+
+  // 첫 play() 시도가 (아직 데이터가 충분히 안 쌓여서) 조용히 실패하는 경우가 있어서,
+  // 실제로 재생 가능해지는 시점(canplay)에 한 번 더 시도한다.
+  function attemptPlay() {
+    videoEl.play().catch(() => {});
+  }
+  videoEl.addEventListener('canplay', attemptPlay);
+  videoEl.addEventListener('loadeddata', attemptPlay);
+
+  function playStream(cn) {
+    currentPlayCn = cn;
+    const streamUrl = buildStreamUrl(cn);
+
+    if (hlsInstance) {
+      hlsInstance.destroy();
+      hlsInstance = null;
+    }
+    videoEl.pause();
+    videoEl.removeAttribute('src');
+    videoEl.load();
+    videoEl.muted = true;
+    updateUnmuteIcon();
+
+    if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+      // iOS Safari/Chrome(WebKit) 네이티브 HLS 재생
+      videoEl.src = streamUrl;
+      attemptPlay();
+    } else if (window.Hls && window.Hls.isSupported()) {
+      // 그 외(Android Chrome, 데스크톱 등) HLS.js로 재생
+      hlsInstance = new Hls();
+      hlsInstance.loadSource(streamUrl);
+      hlsInstance.attachMedia(videoEl);
+      hlsInstance.on(Hls.Events.MANIFEST_PARSED, attemptPlay);
+    }
+  }
+
+  function stopStream() {
+    currentPlayCn = null;
+    if (hlsInstance) {
+      hlsInstance.destroy();
+      hlsInstance = null;
+    }
+    videoEl.pause();
+    videoEl.removeAttribute('src');
+    videoEl.load();
+  }
+
+  function openVideoPanel(name, fallbackUrl, cn) {
+    videoFallback.href = fallbackUrl;
+    playStream(cn);
+    videoPanel.classList.add('open');
+    schoolLogoEl.classList.add('hidden');
+    mapEl.style.height = '0px';
+    resizeMapAfterPanelChange();
+  }
+
+  function closeVideoPanel() {
+    videoPanel.classList.remove('open');
+    stopStream();
+    schoolLogoEl.classList.remove('hidden');
+    mapEl.style.height = CSS.supports('height', '100dvh') ? '100dvh' : '100vh';
+    resizeMapAfterPanelChange();
+  }
+
+  videoCloseBtn.addEventListener('click', closeVideoPanel);
+  videoBackBtn.addEventListener('click', closeVideoPanel);
+
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('.video-link');
+    if (!link) return;
+    e.preventDefault();
+    e.stopPropagation();
+    openVideoPanel(link.dataset.name, link.dataset.url, link.dataset.cn);
+  });
+
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('.school-link');
+    if (!link) return;
+    e.stopPropagation();
+  });
+
+  function updateLabelSize() {
+    const zoom = map.getZoom();
+    let size = BASE_FONT_PX * Math.pow(1.15, zoom - BASE_ZOOM);
+    size = Math.max(MIN_FONT_PX, Math.min(MAX_FONT_PX, size));
+    document.documentElement.style.setProperty('--cctv-font-size', size.toFixed(1) + 'px');
+  }
+
+  const placedMarkers = [];
+  let pendingGeocodes = 0;
+  let markerSeq = 0;
+
+  let openLabelIdx = null;
+
+  function closeAllLabels() {
+    placedMarkers.forEach((m) => {
+      const el = document.getElementById('cctv-label-' + m.idx);
+      if (el) {
+        el.style.display = 'none';
+        el.style.fontSize = '';
+        el.style.transform = '';
+      }
+    });
+    openLabelIdx = null;
+  }
+
+  function toggleLabel(idx) {
+    const labelEl = document.getElementById('cctv-label-' + idx);
+    if (!labelEl) return;
+    const wasOpen = openLabelIdx === idx;
+    closeAllLabels();
+    if (!wasOpen) {
+      labelEl.style.display = 'block';
+      openLabelIdx = idx;
+      requestAnimationFrame(() => requestAnimationFrame(fitOpenLabel));
+    }
+  }
+
+  const LABEL_FIT_MAX_STEPS = 6;
+  const LABEL_FIT_SHRINK_RATIO = 0.85;
+  const LABEL_FIT_MIN_FONT_PX = 10;
+
+  function fitOpenLabel() {
+    if (openLabelIdx === null) return;
+    const labelEl = document.getElementById('cctv-label-' + openLabelIdx);
+    if (!labelEl || labelEl.style.display === 'none') return;
+
+    labelEl.style.transform = '';
+    labelEl.style.fontSize = '';
+
+    for (let step = 0; step < LABEL_FIT_MAX_STEPS; step++) {
+      const rect = labelEl.getBoundingClientRect();
+      const fitsWidth = rect.width <= window.innerWidth;
+      const fitsHeight = rect.height <= window.innerHeight;
+      if (fitsWidth && fitsHeight) break;
+
+      const currentPx = parseFloat(getComputedStyle(labelEl).fontSize);
+      const nextPx = Math.max(LABEL_FIT_MIN_FONT_PX, currentPx * LABEL_FIT_SHRINK_RATIO);
+      labelEl.style.fontSize = nextPx + 'px';
+      if (nextPx <= LABEL_FIT_MIN_FONT_PX) break;
+    }
+
+    const EDGE_MARGIN = 4;
+    const rect2 = labelEl.getBoundingClientRect();
+
+    let dx = 0;
+    if (rect2.right + dx > window.innerWidth - EDGE_MARGIN) {
+      dx += (window.innerWidth - EDGE_MARGIN) - (rect2.right + dx);
+    }
+    if (rect2.left + dx < EDGE_MARGIN) {
+      dx += EDGE_MARGIN - (rect2.left + dx);
+    }
+
+    let dy = 0;
+    if (rect2.bottom + dy > window.innerHeight - EDGE_MARGIN) {
+      dy += (window.innerHeight - EDGE_MARGIN) - (rect2.bottom + dy);
+    }
+    if (rect2.top + dy < EDGE_MARGIN) {
+      dy += EDGE_MARGIN - (rect2.top + dy);
+    }
+
+    if (dx !== 0 || dy !== 0) {
+      labelEl.style.transform = `translate(${dx}px, ${dy}px)`;
+    }
+  }
+
+  window.addEventListener('resize', () => {
+    requestAnimationFrame(() => requestAnimationFrame(fitOpenLabel));
+  });
+
+  function placeMarker(pos, labelHtml, isSchool) {
+    const idx = markerSeq++;
+    const markerGraphic = isSchool
+      ? `<img class="cctv-school-logo" src="images/logo.svg" alt="수지꿈학교 로고" />`
+      : `
+      <svg class="cctv-dot" viewBox="0 0 24 34" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 0C5.373 0 0 5.373 0 12c0 9 12 22 12 22s12-13 12-22c0-6.627-5.373-12-12-12z" fill="currentColor"/>
+        <circle cx="12" cy="12" r="5" fill="#ffffff"/>
+      </svg>`;
+    const labelClass = `cctv-label${isSchool ? ' cctv-label-school' : ''}`;
+    const marker = new naver.maps.Marker({
+      position: pos,
+      map: map,
+      icon: {
+        content: `
+          <div class="cctv-overlay">
+            <div class="${labelClass}" id="cctv-label-${idx}">${labelHtml}</div>
+            <div class="cctv-spacer" id="cctv-spacer-${idx}"></div>
+            ${markerGraphic}
+          </div>`,
+        anchor: new naver.maps.Point(0, 0)
+      }
+    });
+    naver.maps.Event.addListener(marker, 'click', () => toggleLabel(idx));
+    placedMarkers.push({ pos, idx, isSchool });
+  }
+
+  naver.maps.Event.addListener(map, 'idle', () => {
+    updateLabelSize();
+    if (openLabelIdx !== null) {
+      requestAnimationFrame(() => requestAnimationFrame(fitOpenLabel));
+    }
+  });
+
+  naver.maps.Event.addListener(map, 'drag', () => {
+    if (openLabelIdx !== null) {
+      requestAnimationFrame(fitOpenLabel);
+    }
+  });
+
+  naver.maps.Event.addListener(map, 'zoom_changed', () => {
+    if (openLabelIdx !== null) {
+      requestAnimationFrame(fitOpenLabel);
+    }
+  });
+
+  updateLabelSize();
+
+  // 지오코딩 대신 알고 있는 위도/경도를 직접 사용 (33번은 실제 페이지 소스에서
+  // 확인된 값으로 교체함; 나머지는 이전에 확인된 값 그대로)
+const cctvList = [
     { id:'57',  name:'고기동 제1경보국',   lat:37.368686, lng:127.050478 },
     { id:'62',  name:'고기계곡 제3경보국', lat:37.359913, lng:127.055148 },
     { id:'63',  name:'고기계곡 제4경보국', lat:37.367096, lng:127.050518 },
@@ -68,8 +500,24 @@
     { id:'106', name:'말구리고개-3',       lat:37.364376, lng:127.066496 }
   ];
 
-  cctvList.forEach(cctv => {
-    placeMarker(new naver.maps.LatLng(cctv.lat, cctv.lng), `${cctv.name}<a href="http://safe.yongin.go.kr/m/cctv_view.html?cn=${cctv.id}">영상 보기</a>`, false);
+  // 학교 위치 마커 (지오코딩 유지 — 좌표를 모르므로)
+  //naver.maps.Service.geocode({ query: '경기도 용인시 수지구 고기동 347-30' }, (status, response) => {
+  //  if (status === naver.maps.Service.Status.OK) {
+  //    const pos = new naver.maps.LatLng(response.v2.addresses[0].y, response.v2.addresses[0].x);
+  //    map.setCenter(pos);
+  //    placeMarker(
+  //      pos,
+  //      `수지꿈학교<a href="https://www.instagram.com/sujiggumhaggyo/" class="school-link" target="_blank" rel="noopener">인스타그램</a>`,
+  //      true
+  //    );
+  //  }
+  //});
+
+  // CCTV 마커 생성 (좌표가 이미 있으므로 지오코딩 없이 즉시 생성)
+  cctvList.forEach((cctv) => {
+    const pos = new naver.maps.LatLng(cctv.lat, cctv.lng);
+    const link = `http://safe.yongin.go.kr/m/cctv_view.html?cn=${cctv.id}&page=&cd=2&ct=2&ns=`;
+    placeMarker(pos, `${cctv.name}<a href="${link}" class="video-link" data-url="${link}" data-name="${cctv.name}" data-cn="${cctv.id}">영상 보기</a>`, false);
   });
 </script>
 </body>
