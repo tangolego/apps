@@ -20,7 +20,7 @@ jobs:
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
-          projectId: wifimap-852eb
+          projectId: cctv-25804
           channelId: live
       - name: Deploy Functions & Firestore
         run: |
