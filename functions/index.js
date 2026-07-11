@@ -1,5 +1,4 @@
 const { onRequest } = require("firebase-functions/v2/https");
-const { setGlobalOptions } = require("firebase-functions/v2");
 const admin = require("firebase-admin");
 const express = require("express");
 const {
@@ -14,7 +13,11 @@ const db = admin.firestore();
 const spotsCol = db.collection("wifi_spots");
 const cctvCol = db.collection("cctv_spots");
 
-setGlobalOptions({ region: "asia-northeast3", maxInstances: 10 }); // 서울 리전
+// setGlobalOptions 대신 이 함수(api) 전용 옵션을 onRequest에 직접 지정한다.
+// (이전엔 setGlobalOptions로 전역 설정했는데, 이러면 hlsProxy.js의 스트리밍
+//  트래픽과 여기 wifi/cctv 검색 API가 같은 maxInstances 풀을 나눠 쓰게 되어
+//  CCTV 시청자가 몰릴 때 검색 API가 함께 지연되는 문제가 있었다.)
+const REGION = "asia-northeast3"; // 서울 리전
 
 const app = express();
 app.use(express.json());
@@ -26,73 +29,12 @@ app.use(api);
 app.use("/api", api);
 
 // ---------------------------------------------------------------------------
-// GET /proxy?url=<용인시 재난CCTV 스트림 서버 주소>
-//
-// safe.yongin.go.kr/m/cctv_view.html 이 HTTP(비보안)라 HTTPS 페이지에서 바로
-// <video>로 못 여는(mixed content) 문제 + hls.js가 CORS 없이 못 읽는 문제를
-// 우회하기 위한 중계용 프록시. 아무 URL이나 열어주면 오픈 릴레이가 되니
-// yongin.go.kr 스트림 서버 호스트로만 엄격히 제한한다.
+// 참고: 용인시 CCTV HLS 프록시는 이 파일이 아니라 hlsProxy.js에만 구현되어 있다.
+// (프론트엔드 public/index.html은 /hlsProxy/... 경로만 사용하며, 예전에 여기
+//  있던 /api/proxy 라우트는 실제로 호출되지 않는 중복 구현이라 제거했다.
+//  같은 로직이 두 곳에 있으면 한쪽만 고쳤을 때 갈라질 위험이 있고, 별도
+//  함수가 하나 더 배포되어 콜드스타트 경로도 늘어난다.)
 // ---------------------------------------------------------------------------
-const ALLOWED_STREAM_HOSTS = new Set(["safe.yongin.go.kr", "safe2.yongin.go.kr"]);
-
-function isAllowedStreamUrl(u) {
-  try {
-    const parsed = new URL(u);
-    return (
-      parsed.protocol === "http:" &&
-      ALLOWED_STREAM_HOSTS.has(parsed.hostname) &&
-      parsed.port === "1935" &&
-      parsed.pathname.startsWith("/live/")
-    );
-  } catch {
-    return false;
-  }
-}
-
-api.get("/proxy", async (req, res) => {
-  const target = req.query.url;
-  if (!target || !isAllowedStreamUrl(target)) {
-    return res.status(400).json({ error: "허용되지 않은 스트림 주소예요." });
-  }
-
-  let upstream;
-  try {
-    upstream = await fetch(target, { signal: AbortSignal.timeout(8000) });
-  } catch (err) {
-    return res.status(502).json({ error: "스트림 서버에 연결하지 못했어요: " + err.message });
-  }
-
-  if (!upstream.ok) {
-    return res.status(502).json({ error: "스트림 서버 응답 오류: " + upstream.status });
-  }
-
-  res.set("Access-Control-Allow-Origin", "*");
-  res.set("Cache-Control", "no-cache");
-
-  const isPlaylist = target.endsWith(".m3u8");
-
-  if (isPlaylist) {
-    // m3u8은 텍스트라서, 그 안의 세그먼트/하위 플레이리스트 줄들을
-    // 전부 "우리 프록시를 거치는 절대 URL"로 바꿔써야 다음 요청도 프록시를 탄다.
-    const text = await upstream.text();
-    const rewritten = text
-      .split("\n")
-      .map((line) => {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith("#")) return line; // 태그/주석 줄은 그대로
-        const absolute = new URL(trimmed, target).href; // 상대경로 -> 절대경로
-        return `/api/proxy?url=${encodeURIComponent(absolute)}`;
-      })
-      .join("\n");
-    res.set("Content-Type", "application/vnd.apple.mpegurl");
-    return res.send(rewritten);
-  }
-
-  // .ts 세그먼트 등 바이너리는 그대로 스트리밍
-  res.set("Content-Type", upstream.headers.get("content-type") || "video/mp2t");
-  const buf = Buffer.from(await upstream.arrayBuffer());
-  res.send(buf);
-});
 
 // ---------------------------------------------------------------------------
 // POST /spots  (제보 등록)
@@ -158,6 +100,13 @@ api.get("/public-wifi", async (req, res) => {
 // ---------------------------------------------------------------------------
 // GET /spots?lat=&lng=&radius=  (반경 내 활성 스팟 조회, 공공+커뮤니티)
 // ---------------------------------------------------------------------------
+// 밀집 지역(셀 하나에 문서가 아주 많은 경우)에서 읽기 비용과 응답 시간이
+// 무한정 늘어나지 않도록, 거리 필터링 이전 단계에서 쿼리 자체에 상한을 둔다.
+// 이 상한보다 셀 안에 문서가 많으면 먼 것부터 누락될 수 있지만, 애초에
+// radius 파라미터로 사용자가 좁은 범위를 요청한 것이므로 실사용에서는
+// 이 상한에 걸릴 일이 거의 없다.
+const SPOTS_QUERY_LIMIT = 300;
+
 api.get("/spots", async (req, res) => {
   const lat = Number(req.query.lat);
   const lng = Number(req.query.lng);
@@ -172,6 +121,7 @@ api.get("/spots", async (req, res) => {
   const snap = await spotsCol
     .where("status", "==", "active")
     .where("geohash6", "in", cells)
+    .limit(SPOTS_QUERY_LIMIT)
     .get();
 
   const spots = snap.docs
@@ -262,5 +212,7 @@ function toClientSpot(doc) {
   };
 }
 
-exports.api = onRequest(app);
+// 이 함수(wifi/cctv 검색 API) 전용 옵션. hlsProxy.js는 자체 maxInstances(30)를
+// 가지므로, 여기서 10으로 지정해도 스트리밍 트래픽에 잠식되지 않는다.
+exports.api = onRequest({ region: REGION, maxInstances: 10 }, app);
 exports.hlsProxy = require('./hlsProxy').hlsProxy;
